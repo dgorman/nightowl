@@ -70,6 +70,8 @@ class Settings:
     timeseries_keys: Tuple[str, ...]
     attribute_keys: Tuple[str, ...]
     summary_keys: Tuple[str, ...]
+    metrics_host: str
+    metrics_port: int
 
     @staticmethod
     def from_env(env: Optional[dict[str, str]] = None) -> "Settings":
@@ -118,6 +120,17 @@ class Settings:
             source.get("NIGHTOWL_SUMMARY_KEYS"), DEFAULT_SUMMARY_KEYS
         )
 
+        metrics_host = source.get("NIGHTOWL_METRICS_HOST", "0.0.0.0").strip() or "0.0.0.0"
+
+        metrics_port_raw = source.get("NIGHTOWL_METRICS_PORT", "8000")
+        try:
+            metrics_port = int(metrics_port_raw)
+        except ValueError as exc:  # pragma: no cover - defensive branch
+            raise SettingsError("NIGHTOWL_METRICS_PORT must be an integer") from exc
+
+        if not (1 <= metrics_port <= 65535):
+            raise SettingsError("NIGHTOWL_METRICS_PORT must be between 1 and 65535")
+
         return Settings(
             username=username,
             password=password,
@@ -128,6 +141,8 @@ class Settings:
             timeseries_keys=timeseries_keys,
             attribute_keys=attribute_keys,
             summary_keys=summary_keys,
+            metrics_host=metrics_host,
+            metrics_port=metrics_port,
         )
 
 

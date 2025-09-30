@@ -2,6 +2,7 @@
 
 from .client import ApiError, AuthError, DeviceSnapshot, NightOwlClient, TokenBundle
 from .config import Settings, SettingsError
+from .metrics import MetricsService
 
 __all__ = [
     "ApiError",
@@ -11,4 +12,5 @@ __all__ = [
     "TokenBundle",
     "Settings",
     "SettingsError",
+    "MetricsService",
 ]

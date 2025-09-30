@@ -24,6 +24,8 @@ Provide credentials via environment variables (for local development you can sto
 | `NIGHTOWL_TIMESERIES_KEYS` | ⛔️ | Comma-separated list of telemetry keys to request (defaults to the NightOwl Flex list). |
 | `NIGHTOWL_ATTRIBUTE_KEYS` | ⛔️ | Comma-separated list of device attribute keys to request. |
 | `NIGHTOWL_SUMMARY_KEYS` | ⛔️ | Comma-separated keys to display in the log summary (defaults to well level, level %, total gallons). |
+| `NIGHTOWL_METRICS_HOST` | ⛔️ | Bind address for the Prometheus metrics server (defaults to `0.0.0.0`). |
+| `NIGHTOWL_METRICS_PORT` | ⛔️ | TCP port for the Prometheus metrics server (defaults to `8000`). |
 
 ## Run with Docker
 
@@ -45,6 +47,31 @@ source .venv/bin/activate
 pip install -r requirements-dev.txt
 pytest
 ```
+
+## Prometheus Metrics
+
+NightOwl Monitor exposes Prometheus metrics at `http://<host>:<port>/` (by default `http://0.0.0.0:8000/`).
+Key metric families:
+
+- `nightowl_telemetry_value{device_id,device_name,key}` — numeric telemetry readings (volts, amps, levels, etc.).
+- `nightowl_attribute_value{...}` — numeric device attributes (boolean strings are mapped to 1/0).
+- `nightowl_device_info{device_id,device_name}` — presence indicator for each discovered device.
+- `nightowl_last_poll_success` / `nightowl_last_poll_timestamp` — health markers for the polling loop.
+- `nightowl_poll_attempts_total{status}` — counter of successful vs failed polls.
+
+### Scrape configuration example
+
+Add the following job to your Prometheus configuration (replace the target host if needed) to integrate the metrics into your SolarDashboard Prometheus instance:
+
+```yaml
+scrape_configs:
+  - job_name: "nightowl-monitor"
+    metrics_path: "/"
+    static_configs:
+      - targets: ["nightowl-monitor.local:8000"]
+```
+
+If you're running the container locally, you can replace `nightowl-monitor.local` with `localhost`. When deploying alongside Prometheus (e.g., via Docker Compose), use the service name from the shared network.
 
 ## Sample Output
 

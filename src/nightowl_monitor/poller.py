@@ -6,10 +6,11 @@ import logging
 import signal
 import sys
 import threading
-from typing import Dict, Iterable, Optional, Sequence, Tuple
+from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
 from .client import ApiError, AuthError, DeviceSnapshot, NightOwlClient
 from .config import Settings, SettingsError
+from .metrics import MetricsService
 
 _LOGGER = logging.getLogger("nightowl.monitor")
 
@@ -30,31 +31,29 @@ def _install_signal_handlers(stop_event: threading.Event) -> None:
         signal.signal(sig, _handle)
 
 
-def run_once(client: NightOwlClient, settings: Settings) -> None:
-    """Execute a single authentication cycle."""
+def run_once(client: NightOwlClient, settings: Settings) -> List[DeviceSnapshot]:
+    """Execute a single authentication cycle and return device snapshots."""
 
     tokens = client.authenticate(settings.username, settings.password, settings.tenant)
     masked = tokens.token[:8] + "..." if tokens.token else "<empty>"
     _LOGGER.info("Authenticated successfully; token prefix %s", masked)
 
-    try:
-        snapshots = client.fetch_latest_device_data(
-            tokens.token,
-            timeseries_keys=settings.timeseries_keys,
-            attribute_keys=settings.attribute_keys,
-            page_size=settings.page_size,
-        )
-    except ApiError as exc:
-        _LOGGER.error("Failed to retrieve latest device data: %s", exc)
-        return
+    snapshots = client.fetch_latest_device_data(
+        tokens.token,
+        timeseries_keys=settings.timeseries_keys,
+        attribute_keys=settings.attribute_keys,
+        page_size=settings.page_size,
+    )
 
     if not snapshots:
         _LOGGER.info("No devices returned by the NightOwl API")
-        return
+        return []
 
     for snapshot in snapshots:
         report = _format_device_report(snapshot, settings.summary_keys)
         _LOGGER.info("%s", report)
+
+    return snapshots
 
 
 def run_polling_loop(settings: Settings) -> None:
@@ -62,6 +61,16 @@ def run_polling_loop(settings: Settings) -> None:
 
     _configure_logging()
     client = NightOwlClient(base_url=settings.base_url)
+    metrics = MetricsService(
+        host=settings.metrics_host,
+        port=settings.metrics_port,
+    )
+
+    _LOGGER.info(
+        "Prometheus metrics listening on %s:%s",
+        settings.metrics_host,
+        settings.metrics_port,
+    )
 
     stop_event = threading.Event()
     _install_signal_handlers(stop_event)
@@ -74,10 +83,16 @@ def run_polling_loop(settings: Settings) -> None:
 
     while not stop_event.is_set():
         try:
-            run_once(client, settings)
+            snapshots = run_once(client, settings)
+            metrics.record_success(snapshots)
         except AuthError as exc:
+            metrics.record_failure()
             _LOGGER.error("Authentication attempt failed: %s", exc)
+        except ApiError as exc:
+            metrics.record_failure()
+            _LOGGER.error("Failed to retrieve latest device data: %s", exc)
         except Exception:  # pragma: no cover - safety net for unexpected errors
+            metrics.record_failure()
             _LOGGER.exception("Unexpected error while polling NightOwl")
 
         if stop_event.wait(settings.poll_interval_seconds):

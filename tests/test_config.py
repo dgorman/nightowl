@@ -26,6 +26,8 @@ def test_settings_from_env_defaults():
     assert settings.timeseries_keys == DEFAULT_TIMESERIES_KEYS
     assert settings.attribute_keys == DEFAULT_ATTRIBUTE_KEYS
     assert settings.summary_keys == DEFAULT_SUMMARY_KEYS
+    assert settings.metrics_host == "0.0.0.0"
+    assert settings.metrics_port == 8000
 
 
 def test_settings_requires_username_password():
@@ -47,6 +49,8 @@ def test_settings_custom_values():
         "NIGHTOWL_TIMESERIES_KEYS": "A,B,C",
         "NIGHTOWL_ATTRIBUTE_KEYS": "X , Y",
         "NIGHTOWL_SUMMARY_KEYS": "A,X",
+        "NIGHTOWL_METRICS_HOST": "127.0.0.1",
+        "NIGHTOWL_METRICS_PORT": "9100",
     }
 
     settings = Settings.from_env(env)
@@ -58,6 +62,8 @@ def test_settings_custom_values():
     assert settings.timeseries_keys == ("A", "B", "C")
     assert settings.attribute_keys == ("X", "Y")
     assert settings.summary_keys == ("A", "X")
+    assert settings.metrics_host == "127.0.0.1"
+    assert settings.metrics_port == 9100
 
 
 def test_settings_invalid_interval():
@@ -87,6 +93,17 @@ def test_settings_empty_custom_keys():
         "NIGHTOWL_USERNAME": "user",
         "NIGHTOWL_PASSWORD": "pass",
         "NIGHTOWL_TIMESERIES_KEYS": ", ",
+    }
+
+    with pytest.raises(SettingsError):
+        Settings.from_env(env)
+
+
+def test_settings_invalid_metrics_port():
+    env = {
+        "NIGHTOWL_USERNAME": "user",
+        "NIGHTOWL_PASSWORD": "pass",
+        "NIGHTOWL_METRICS_PORT": "70000",
     }
 
     with pytest.raises(SettingsError):
