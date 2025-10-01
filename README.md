@@ -73,6 +73,19 @@ scrape_configs:
 
 If you're running the container locally, you can replace `nightowl-monitor.local` with `localhost`. When deploying alongside Prometheus (e.g., via Docker Compose), use the service name from the shared network.
 
+### Grafana dashboard
+
+Import `grafana/nightowl-dashboard.json` into Grafana to get a starter view over the NightOwl data. The dashboard expects a Prometheus data source; during import, choose the data source that scrapes your NightOwl monitor.
+
+The dashboard includes:
+
+- **Water Level %** stat card sourced from `Level1_precent` telemetry.
+- **Pump Voltages/Currents** time-series panels (keys `P1V1-3`, `P1C1-3`).
+- **Device Attributes** table for metadata such as `CustomerInfo` and modem status.
+- **Poll Status** indicator driven by `nightowl_last_poll_success`.
+
+Use the *Device* dropdown (populated via `nightowl_device_info`) to focus on a specific NightOwl device.
+
 ## Sample Output
 
 ```text
