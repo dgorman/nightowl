@@ -25,7 +25,7 @@ Provide credentials via environment variables (for local development you can sto
 | `NIGHTOWL_ATTRIBUTE_KEYS` | ⛔️ | Comma-separated list of device attribute keys to request. |
 | `NIGHTOWL_SUMMARY_KEYS` | ⛔️ | Comma-separated keys to display in the log summary (defaults to well level, level %, total gallons). |
 | `NIGHTOWL_METRICS_HOST` | ⛔️ | Bind address for the Prometheus metrics server (defaults to `0.0.0.0`). |
-| `NIGHTOWL_METRICS_PORT` | ⛔️ | TCP port for the Prometheus metrics server (defaults to `8000`). |
+| `NIGHTOWL_METRICS_PORT` | ⛔️ | TCP port for the Prometheus metrics server (defaults to `8010`). |
 
 ## Run with Docker
 
@@ -50,7 +50,7 @@ pytest
 
 ## Prometheus Metrics
 
-NightOwl Monitor exposes Prometheus metrics at `http://<host>:<port>/` (by default `http://0.0.0.0:8000/`).
+NightOwl Monitor exposes Prometheus metrics at `http://<host>:<port>/` (by default `http://0.0.0.0:8010/`).
 Key metric families:
 
 - `nightowl_telemetry_value{device_id,device_name,key}` — numeric telemetry readings (volts, amps, levels, etc.).
@@ -68,7 +68,7 @@ scrape_configs:
   - job_name: "nightowl-monitor"
     metrics_path: "/"
     static_configs:
-      - targets: ["nightowl-monitor.local:8000"]
+  - targets: ["nightowl-monitor.local:8010"]
 ```
 
 If you're running the container locally, you can replace `nightowl-monitor.local` with `localhost`. When deploying alongside Prometheus (e.g., via Docker Compose), use the service name from the shared network.

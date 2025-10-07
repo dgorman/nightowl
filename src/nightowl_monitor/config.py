@@ -121,8 +121,7 @@ class Settings:
         )
 
         metrics_host = source.get("NIGHTOWL_METRICS_HOST", "0.0.0.0").strip() or "0.0.0.0"
-
-        metrics_port_raw = source.get("NIGHTOWL_METRICS_PORT", "8000")
+        metrics_port_raw = source.get("NIGHTOWL_METRICS_PORT", "8010")
         try:
             metrics_port = int(metrics_port_raw)
         except ValueError as exc:  # pragma: no cover - defensive branch
