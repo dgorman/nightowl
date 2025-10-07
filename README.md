@@ -61,6 +61,8 @@ Key metric families:
 
 ### Scrape configuration example
 
+> Shared Prometheus configs now live in the `monitoring/` submodule that tracks [`dgorman/infrastructure`](https://github.com/dgorman/infrastructure). After cloning this repo run `git submodule update --init --recursive` so the files are available locally.
+
 Add the following job to your Prometheus configuration (replace the target host if needed) to integrate the metrics into your SolarDashboard Prometheus instance:
 
 ```yaml

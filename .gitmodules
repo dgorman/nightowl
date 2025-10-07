@@ -1,0 +1,4 @@
+[submodule "monitoring"]
+	path = monitoring
+	url = https://github.com/dgorman/infrastructure.git
+	branch = main
