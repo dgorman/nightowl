@@ -374,9 +374,329 @@
             }
           ]
         }
+      },
+      {
+        "id": 9,
+        "title": "🚨 Leak Detection",
+        "type": "row",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 23},
+        "collapsed": false
+      },
+      {
+        "id": 10,
+        "title": "Leak Probability Score",
+        "type": "stat",
+        "gridPos": {"h": 8, "w": 6, "x": 0, "y": 24},
+        "datasource": {"uid": "af1z6oz34c7b4f", "type": "prometheus"},
+        "targets": [
+          {
+            "expr": "nightowl:leak_probability_score or clamp_max(((avg_over_time(nightowl_telemetry_value{key=\"P1C1\"}[1h]) / (avg_over_time(nightowl_telemetry_value{key=\"P1C1\"}[8d]) + 0.01) - 1) > 0.5) * 30 + ((avg_over_time(nightowl_telemetry_value{key=\"S1\"}[8d]) - nightowl_telemetry_value{key=\"S1\"}) / (stddev_over_time(nightowl_telemetry_value{key=\"S1\"}[8d]) + 0.1) > 2.5) * 40 + (hour() >= 23 or hour() < 5) * (nightowl_telemetry_value{key=\"P1C1\"} > 0.5) * 30, 100)",
+            "legendFormat": "Leak Score",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"]
+          },
+          "textMode": "value",
+          "graphMode": "area",
+          "colorMode": "background",
+          "justifyMode": "center",
+          "orientation": "auto"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "decimals": 0,
+            "min": 0,
+            "max": 100,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": null, "color": "green"},
+                {"value": 30, "color": "yellow"},
+                {"value": 50, "color": "orange"},
+                {"value": 70, "color": "red"}
+              ]
+            }
+          }
+        },
+        "description": "Composite leak probability based on pump duty cycle anomaly (30%), pressure drop (40%), and night-time pump activity (30%). Score ≥70% indicates likely leak."
+      },
+      {
+        "id": 11,
+        "title": "Pressure Drop Anomaly",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 4, "x": 6, "y": 24},
+        "datasource": {"uid": "af1z6oz34c7b4f", "type": "prometheus"},
+        "targets": [
+          {
+            "expr": "(avg_over_time(nightowl_telemetry_value{key=\"S1\"}[8d]) - nightowl_telemetry_value{key=\"S1\"}) / (stddev_over_time(nightowl_telemetry_value{key=\"S1\"}[8d]) + 0.1)",
+            "legendFormat": "Pressure Z-Score",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"]
+          },
+          "textMode": "value_and_name",
+          "graphMode": "none",
+          "colorMode": "background",
+          "orientation": "auto"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "decimals": 2,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": null, "color": "green"},
+                {"value": 1.5, "color": "yellow"},
+                {"value": 2.5, "color": "red"}
+              ]
+            }
+          }
+        },
+        "description": "Standard deviations below 8-day average. >2.5 = significant drop (potential leak)"
+      },
+      {
+        "id": 12,
+        "title": "Pump Duty Cycle Anomaly",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 4, "x": 10, "y": 24},
+        "datasource": {"uid": "af1z6oz34c7b4f", "type": "prometheus"},
+        "targets": [
+          {
+            "expr": "(avg_over_time(nightowl_telemetry_value{key=\"P1C1\"}[1h]) - avg_over_time(nightowl_telemetry_value{key=\"P1C1\"}[8d])) / (stddev_over_time(nightowl_telemetry_value{key=\"P1C1\"}[8d]) + 0.01)",
+            "legendFormat": "Pump Current Z-Score",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"]
+          },
+          "textMode": "value_and_name",
+          "graphMode": "none",
+          "colorMode": "background",
+          "orientation": "auto"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "decimals": 2,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": null, "color": "green"},
+                {"value": 1.5, "color": "yellow"},
+                {"value": 2.5, "color": "red"}
+              ]
+            }
+          }
+        },
+        "description": "Pump running more than normal. >2.5σ = excessive runtime (potential leak)"
+      },
+      {
+        "id": 13,
+        "title": "Night Pump Activity",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 4, "x": 14, "y": 24},
+        "datasource": {"uid": "af1z6oz34c7b4f", "type": "prometheus"},
+        "targets": [
+          {
+            "expr": "(hour() >= 23 or hour() < 5) * (nightowl_telemetry_value{key=\"P1C1\"} > 0.5)",
+            "legendFormat": "Night Pump Running",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"]
+          },
+          "textMode": "name",
+          "graphMode": "none",
+          "colorMode": "background",
+          "orientation": "auto"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": null, "color": "green"},
+                {"value": 1, "color": "red"}
+              ]
+            },
+            "mappings": [
+              {"type": "value", "value": "0", "text": "No Activity"},
+              {"type": "value", "value": "1", "text": "PUMP RUNNING"}
+            ]
+          }
+        },
+        "description": "Pump activity between 11pm-5am (strong leak indicator)"
+      },
+      {
+        "id": 14,
+        "title": "Water Level (when available)",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 4, "x": 18, "y": 24},
+        "datasource": {"uid": "af1z6oz34c7b4f", "type": "prometheus"},
+        "targets": [
+          {
+            "expr": "(avg_over_time(nightowl_telemetry_value{key=\"Level1_precent\"}[8d]) - nightowl_telemetry_value{key=\"Level1_precent\"}) / (stddev_over_time(nightowl_telemetry_value{key=\"Level1_precent\"}[8d]) + 0.1)",
+            "legendFormat": "Level Drop Z-Score",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"]
+          },
+          "textMode": "value_and_name",
+          "graphMode": "none",
+          "colorMode": "background",
+          "orientation": "auto"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "decimals": 2,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": null, "color": "green"},
+                {"value": 1.5, "color": "yellow"},
+                {"value": 2.5, "color": "red"}
+              ]
+            }
+          }
+        },
+        "description": "Will show data when Level1_precent metric becomes available"
+      },
+      {
+        "id": 15,
+        "title": "Leak Detection Trend (8 Days)",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 28},
+        "datasource": {"uid": "af1z6oz34c7b4f", "type": "prometheus"},
+        "targets": [
+          {
+            "expr": "nightowl:leak_probability_score or clamp_max(((avg_over_time(nightowl_telemetry_value{key=\"P1C1\"}[1h]) / (avg_over_time(nightowl_telemetry_value{key=\"P1C1\"}[8d]) + 0.01) - 1) > 0.5) * 30 + ((avg_over_time(nightowl_telemetry_value{key=\"S1\"}[8d]) - nightowl_telemetry_value{key=\"S1\"}) / (stddev_over_time(nightowl_telemetry_value{key=\"S1\"}[8d]) + 0.1) > 2.5) * 40 + (hour() >= 23 or hour() < 5) * (nightowl_telemetry_value{key=\"P1C1\"} > 0.5) * 30, 100)",
+            "legendFormat": "Leak Probability %",
+            "refId": "A"
+          },
+          {
+            "expr": "(avg_over_time(nightowl_telemetry_value{key=\"S1\"}[8d]) - nightowl_telemetry_value{key=\"S1\"}) / (stddev_over_time(nightowl_telemetry_value{key=\"S1\"}[8d]) + 0.1) * 10",
+            "legendFormat": "Pressure Anomaly (scaled)",
+            "refId": "B"
+          },
+          {
+            "expr": "(nightowl_telemetry_value{key=\"P1C1\"} > 0.5) * 20",
+            "legendFormat": "Pump Running",
+            "refId": "C"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "custom": {
+              "drawStyle": "line",
+              "lineWidth": 2,
+              "fillOpacity": 15,
+              "showPoints": "never",
+              "axisPlacement": "auto"
+            },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": null, "color": "green"},
+                {"value": 50, "color": "orange"},
+                {"value": 70, "color": "red"}
+              ]
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {"id": "byName", "options": "Leak Probability %"},
+              "properties": [
+                {"id": "custom.lineWidth", "value": 3},
+                {"id": "custom.fillOpacity", "value": 25}
+              ]
+            }
+          ]
+        },
+        "options": {
+          "tooltip": {
+            "mode": "multi",
+            "sort": "none"
+          },
+          "legend": {
+            "showLegend": true,
+            "displayMode": "list",
+            "placement": "bottom"
+          }
+        },
+        "description": "Timeline of leak detection score and contributing factors"
+      },
+      {
+        "id": 16,
+        "title": "Active Leak Alerts",
+        "type": "table",
+        "gridPos": {"h": 6, "w": 24, "x": 0, "y": 36},
+        "datasource": {"uid": "af1z6oz34c7b4f", "type": "prometheus"},
+        "targets": [
+          {
+            "expr": "ALERTS{alertname=~\"NightOwl.*\", alertstate=\"firing\"}",
+            "legendFormat": "",
+            "refId": "A",
+            "format": "table",
+            "instant": true
+          }
+        ],
+        "options": {
+          "showHeader": true,
+          "sortBy": []
+        },
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "align": "auto",
+              "filterable": false
+            }
+          },
+          "overrides": []
+        },
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {
+                "Time": true,
+                "Value": true,
+                "__name__": true,
+                "job": true,
+                "instance": true
+              },
+              "indexByName": {},
+              "renameByName": {
+                "alertname": "Alert",
+                "severity": "Severity",
+                "alertstate": "State",
+                "device_name": "Device"
+              }
+            }
+          }
+        ],
+        "description": "Currently firing Prometheus alerts for NightOwl monitoring"
       }
     ]
   },
   "overwrite": true,
-  "message": "8-day baseline analysis dashboard with current metrics"
+  "message": "Added leak detection panels with simplified metrics"
 }
