@@ -19,7 +19,7 @@
         "title": "Current Pressure vs 8-Day Average",
         "type": "stat",
         "gridPos": {"h": 8, "w": 6, "x": 0, "y": 1},
-        "datasource": {"uid": "ef1d1qjhra0hsb", "type": "prometheus"},
+        "datasource": {"uid": "af1z6oz34c7b4f", "type": "prometheus"},
         "targets": [
           {
             "expr": "nightowl_telemetry_value{key=\"S1\"}",
@@ -64,7 +64,7 @@
         "title": "Pressure Trend (8 Days)",
         "type": "timeseries",
         "gridPos": {"h": 8, "w": 18, "x": 6, "y": 1},
-        "datasource": {"uid": "ef1d1qjhra0hsb", "type": "prometheus"},
+        "datasource": {"uid": "af1z6oz34c7b4f", "type": "prometheus"},
         "targets": [
           {
             "expr": "nightowl_telemetry_value{key=\"S1\"}",
@@ -121,7 +121,7 @@
         "title": "Pump Current (Last 24h)",
         "type": "timeseries",
         "gridPos": {"h": 8, "w": 12, "x": 0, "y": 9},
-        "datasource": {"uid": "ef1d1qjhra0hsb", "type": "prometheus"},
+        "datasource": {"uid": "af1z6oz34c7b4f", "type": "prometheus"},
         "targets": [
           {
             "expr": "nightowl_telemetry_value{key=\"P1C1\"}",
@@ -169,7 +169,7 @@
         "title": "Pump Statistics (8 Days)",
         "type": "stat",
         "gridPos": {"h": 8, "w": 12, "x": 12, "y": 9},
-        "datasource": {"uid": "ef1d1qjhra0hsb", "type": "prometheus"},
+        "datasource": {"uid": "af1z6oz34c7b4f", "type": "prometheus"},
         "targets": [
           {
             "expr": "max_over_time(nightowl_telemetry_value{key=\"P1C1\"}[8d])",
@@ -215,7 +215,7 @@
         "title": "Pressure Drop Detection (Z-Score)",
         "type": "stat",
         "gridPos": {"h": 6, "w": 8, "x": 0, "y": 17},
-        "datasource": {"uid": "ef1d1qjhra0hsb", "type": "prometheus"},
+        "datasource": {"uid": "af1z6oz34c7b4f", "type": "prometheus"},
         "targets": [
           {
             "expr": "(avg_over_time(nightowl_telemetry_value{key=\"S1\"}[8d]) - nightowl_telemetry_value{key=\"S1\"}) / stddev_over_time(nightowl_telemetry_value{key=\"S1\"}[8d])",
@@ -253,7 +253,7 @@
         "title": "Current Metrics",
         "type": "stat",
         "gridPos": {"h": 6, "w": 8, "x": 8, "y": 17},
-        "datasource": {"uid": "ef1d1qjhra0hsb", "type": "prometheus"},
+        "datasource": {"uid": "af1z6oz34c7b4f", "type": "prometheus"},
         "targets": [
           {
             "expr": "nightowl_telemetry_value{key=\"S1\"}",
@@ -318,7 +318,7 @@
         "title": "8-Day Baselines",
         "type": "stat",
         "gridPos": {"h": 6, "w": 8, "x": 16, "y": 17},
-        "datasource": {"uid": "ef1d1qjhra0hsb", "type": "prometheus"},
+        "datasource": {"uid": "af1z6oz34c7b4f", "type": "prometheus"},
         "targets": [
           {
             "expr": "avg_over_time(nightowl_telemetry_value{key=\"S1\"}[8d])",
