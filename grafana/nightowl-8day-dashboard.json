@@ -1,0 +1,382 @@
+{
+  "dashboard": {
+    "title": "NightOwl - 8 Day Analysis",
+    "tags": ["nightowl", "water", "monitoring", "baseline"],
+    "timezone": "browser",
+    "schemaVersion": 38,
+    "version": 0,
+    "refresh": "1m",
+    "panels": [
+      {
+        "id": 1,
+        "title": "📊 8-Day Baseline Analysis",
+        "type": "row",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 0},
+        "collapsed": false
+      },
+      {
+        "id": 2,
+        "title": "Current Pressure vs 8-Day Average",
+        "type": "stat",
+        "gridPos": {"h": 8, "w": 6, "x": 0, "y": 1},
+        "datasource": {"uid": "ef1d1qjhra0hsb", "type": "prometheus"},
+        "targets": [
+          {
+            "expr": "nightowl_telemetry_value{key=\"S1\"}",
+            "legendFormat": "Current",
+            "refId": "A"
+          },
+          {
+            "expr": "avg_over_time(nightowl_telemetry_value{key=\"S1\"}[8d])",
+            "legendFormat": "8-Day Avg",
+            "refId": "B"
+          }
+        ],
+        "options": {
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"]
+          },
+          "text": {},
+          "textMode": "value_and_name",
+          "graphMode": "area",
+          "colorMode": "value",
+          "justifyMode": "auto",
+          "orientation": "auto"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "pressurepsi",
+            "decimals": 1,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": null, "color": "green"},
+                {"value": 35, "color": "yellow"},
+                {"value": 30, "color": "red"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 3,
+        "title": "Pressure Trend (8 Days)",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 18, "x": 6, "y": 1},
+        "datasource": {"uid": "ef1d1qjhra0hsb", "type": "prometheus"},
+        "targets": [
+          {
+            "expr": "nightowl_telemetry_value{key=\"S1\"}",
+            "legendFormat": "Current Pressure",
+            "refId": "A"
+          },
+          {
+            "expr": "avg_over_time(nightowl_telemetry_value{key=\"S1\"}[8d])",
+            "legendFormat": "8-Day Average",
+            "refId": "B"
+          },
+          {
+            "expr": "avg_over_time(nightowl_telemetry_value{key=\"S1\"}[24h])",
+            "legendFormat": "24-Hour Average",
+            "refId": "C"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "pressurepsi",
+            "custom": {
+              "drawStyle": "line",
+              "lineWidth": 2,
+              "fillOpacity": 10,
+              "showPoints": "never",
+              "axisPlacement": "auto"
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {"id": "byName", "options": "8-Day Average"},
+              "properties": [
+                {"id": "custom.lineStyle", "value": {"fill": "dash"}},
+                {"id": "color", "value": {"mode": "fixed", "fixedColor": "yellow"}},
+                {"id": "custom.lineWidth", "value": 3}
+              ]
+            }
+          ]
+        },
+        "options": {
+          "tooltip": {
+            "mode": "multi",
+            "sort": "none"
+          },
+          "legend": {
+            "showLegend": true,
+            "displayMode": "list",
+            "placement": "bottom"
+          }
+        }
+      },
+      {
+        "id": 4,
+        "title": "Pump Current (Last 24h)",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 9},
+        "datasource": {"uid": "ef1d1qjhra0hsb", "type": "prometheus"},
+        "targets": [
+          {
+            "expr": "nightowl_telemetry_value{key=\"P1C1\"}",
+            "legendFormat": "Phase 1 Current",
+            "refId": "A"
+          },
+          {
+            "expr": "avg_over_time(nightowl_telemetry_value{key=\"P1C1\"}[8d])",
+            "legendFormat": "8-Day Average",
+            "refId": "B"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "amp",
+            "custom": {
+              "drawStyle": "line",
+              "lineWidth": 1,
+              "fillOpacity": 20,
+              "showPoints": "never"
+            },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": null, "color": "green"},
+                {"value": 0.5, "color": "yellow"},
+                {"value": 3, "color": "orange"}
+              ]
+            }
+          }
+        },
+        "options": {
+          "tooltip": {
+            "mode": "multi"
+          },
+          "legend": {
+            "showLegend": true,
+            "displayMode": "list",
+            "placement": "bottom"
+          }
+        }
+      },
+      {
+        "id": 5,
+        "title": "Pump Statistics (8 Days)",
+        "type": "stat",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 9},
+        "datasource": {"uid": "ef1d1qjhra0hsb", "type": "prometheus"},
+        "targets": [
+          {
+            "expr": "max_over_time(nightowl_telemetry_value{key=\"P1C1\"}[8d])",
+            "legendFormat": "Max Current",
+            "refId": "A"
+          },
+          {
+            "expr": "avg_over_time(nightowl_telemetry_value{key=\"P1C1\"}[8d])",
+            "legendFormat": "Avg Current",
+            "refId": "B"
+          },
+          {
+            "expr": "min_over_time(nightowl_telemetry_value{key=\"P1C1\"}[8d])",
+            "legendFormat": "Min Current",
+            "refId": "C"
+          }
+        ],
+        "options": {
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"]
+          },
+          "textMode": "value_and_name",
+          "graphMode": "area",
+          "colorMode": "value",
+          "orientation": "auto"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "amp",
+            "decimals": 2,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": null, "color": "green"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 6,
+        "title": "Pressure Drop Detection (Z-Score)",
+        "type": "stat",
+        "gridPos": {"h": 6, "w": 8, "x": 0, "y": 17},
+        "datasource": {"uid": "ef1d1qjhra0hsb", "type": "prometheus"},
+        "targets": [
+          {
+            "expr": "(avg_over_time(nightowl_telemetry_value{key=\"S1\"}[8d]) - nightowl_telemetry_value{key=\"S1\"}) / stddev_over_time(nightowl_telemetry_value{key=\"S1\"}[8d])",
+            "legendFormat": "Pressure Z-Score",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"]
+          },
+          "textMode": "value_and_name",
+          "graphMode": "none",
+          "colorMode": "background",
+          "orientation": "auto"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "decimals": 2,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": null, "color": "green"},
+                {"value": 1.5, "color": "yellow"},
+                {"value": 2.5, "color": "red"}
+              ]
+            }
+          }
+        },
+        "description": "Z-score > 2.5 indicates pressure is dropping significantly below 8-day average (potential leak)"
+      },
+      {
+        "id": 7,
+        "title": "Current Metrics",
+        "type": "stat",
+        "gridPos": {"h": 6, "w": 8, "x": 8, "y": 17},
+        "datasource": {"uid": "ef1d1qjhra0hsb", "type": "prometheus"},
+        "targets": [
+          {
+            "expr": "nightowl_telemetry_value{key=\"S1\"}",
+            "legendFormat": "Pressure",
+            "refId": "A"
+          },
+          {
+            "expr": "nightowl_telemetry_value{key=\"P1C1\"}",
+            "legendFormat": "Pump Current",
+            "refId": "B"
+          },
+          {
+            "expr": "nightowl_telemetry_value{key=\"P1V1\"}",
+            "legendFormat": "Voltage",
+            "refId": "C"
+          }
+        ],
+        "options": {
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"]
+          },
+          "textMode": "value_and_name",
+          "graphMode": "none",
+          "colorMode": "value",
+          "orientation": "auto"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "decimals": 1,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": null, "color": "green"}
+              ]
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {"id": "byName", "options": "Pressure"},
+              "properties": [
+                {"id": "unit", "value": "pressurepsi"}
+              ]
+            },
+            {
+              "matcher": {"id": "byName", "options": "Pump Current"},
+              "properties": [
+                {"id": "unit", "value": "amp"}
+              ]
+            },
+            {
+              "matcher": {"id": "byName", "options": "Voltage"},
+              "properties": [
+                {"id": "unit", "value": "volt"}
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": 8,
+        "title": "8-Day Baselines",
+        "type": "stat",
+        "gridPos": {"h": 6, "w": 8, "x": 16, "y": 17},
+        "datasource": {"uid": "ef1d1qjhra0hsb", "type": "prometheus"},
+        "targets": [
+          {
+            "expr": "avg_over_time(nightowl_telemetry_value{key=\"S1\"}[8d])",
+            "legendFormat": "Avg Pressure",
+            "refId": "A"
+          },
+          {
+            "expr": "stddev_over_time(nightowl_telemetry_value{key=\"S1\"}[8d])",
+            "legendFormat": "StdDev Pressure",
+            "refId": "B"
+          },
+          {
+            "expr": "avg_over_time(nightowl_telemetry_value{key=\"P1C1\"}[8d])",
+            "legendFormat": "Avg Pump Current",
+            "refId": "C"
+          }
+        ],
+        "options": {
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"]
+          },
+          "textMode": "value_and_name",
+          "graphMode": "none",
+          "colorMode": "value",
+          "orientation": "auto"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "decimals": 2,
+            "color": {
+              "mode": "palette-classic"
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {"id": "byName", "options": "Avg Pressure"},
+              "properties": [
+                {"id": "unit", "value": "pressurepsi"}
+              ]
+            },
+            {
+              "matcher": {"id": "byName", "options": "StdDev Pressure"},
+              "properties": [
+                {"id": "unit", "value": "pressurepsi"}
+              ]
+            },
+            {
+              "matcher": {"id": "byName", "options": "Avg Pump Current"},
+              "properties": [
+                {"id": "unit", "value": "amp"}
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "overwrite": true,
+  "message": "8-day baseline analysis dashboard with current metrics"
+}
