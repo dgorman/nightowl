@@ -32,10 +32,10 @@ patches:
       kind: Deployment
       name: nightowl-monitor
 
-# Create dev secrets
+# Create dev secrets (using production credentials)
 secretGenerator:
   - name: nightowl-secret
     literals:
-      - username=dev_user
-      - password=dev_password
-      - tenant=dev_tenant
+      - username=dgorman@nightowl.com
+      - password=REPLACE_WITH_ACTUAL_PASSWORD
+      - tenant=""
