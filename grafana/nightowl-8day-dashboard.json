@@ -427,123 +427,204 @@
       },
       {
         "id": 11,
-        "title": "Leak Indicators Status",
-        "type": "table",
-        "gridPos": {"h": 8, "w": 18, "x": 6, "y": 24},
+        "title": "Pressure Drop",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 6, "y": 24},
         "datasource": {"uid": "af1z6oz34c7b4f", "type": "prometheus"},
         "targets": [
           {
-            "expr": "label_replace(((avg_over_time(nightowl_telemetry_value{key=\"S1\"}[8d]) - nightowl_telemetry_value{key=\"S1\"}) / (stddev_over_time(nightowl_telemetry_value{key=\"S1\"}[8d]) + 0.1) > 2.5) * 100, \"indicator\", \"Pressure Drop\", \"\", \"\")",
-            "legendFormat": "",
-            "refId": "A",
-            "instant": true
-          },
-          {
-            "expr": "label_replace(((avg_over_time(nightowl_telemetry_value{key=\"P1C1\"}[1h]) - avg_over_time(nightowl_telemetry_value{key=\"P1C1\"}[8d])) / (stddev_over_time(nightowl_telemetry_value{key=\"P1C1\"}[8d]) + 0.01) > 2.5) * 100, \"indicator\", \"Excessive Pump Runtime\", \"\", \"\")",
-            "legendFormat": "",
-            "refId": "B",
-            "instant": true
-          },
-          {
-            "expr": "label_replace((hour() >= 23 or hour() < 5) * (nightowl_telemetry_value{key=\"P1C1\"} > 0.5) * 100, \"indicator\", \"Night Pump Activity (11pm-5am)\", \"\", \"\")",
-            "legendFormat": "",
-            "refId": "C",
-            "instant": true
-          },
-          {
-            "expr": "label_replace(((avg_over_time(nightowl_telemetry_value{key=\"Level1_precent\"}[8d]) - nightowl_telemetry_value{key=\"Level1_precent\"}) / (stddev_over_time(nightowl_telemetry_value{key=\"Level1_precent\"}[8d]) + 0.1) > 2.5) * 100 or label_replace(vector(0), \"indicator\", \"Rapid Level Drop (awaiting data)\", \"\", \"\"), \"indicator\", \"Rapid Level Drop (awaiting data)\", \"\", \"\")",
-            "legendFormat": "",
-            "refId": "D",
-            "instant": true
-          },
-          {
-            "expr": "label_replace(((increase(nightowl_telemetry_value{key=\"Pulse_TotalGallons\"}[24h]) - avg_over_time(increase(nightowl_telemetry_value{key=\"Pulse_TotalGallons\"}[24h])[8d:1d])) / (stddev_over_time(increase(nightowl_telemetry_value{key=\"Pulse_TotalGallons\"}[24h])[8d:1d]) + 1) > 2.5) * 100 or label_replace(vector(0), \"indicator\", \"Excessive Water Usage (awaiting data)\", \"\", \"\"), \"indicator\", \"Excessive Water Usage (awaiting data)\", \"\", \"\")",
-            "legendFormat": "",
-            "refId": "E",
-            "instant": true
+            "expr": "(avg_over_time(nightowl_telemetry_value{key=\"S1\"}[8d]) - nightowl_telemetry_value{key=\"S1\"}) / (stddev_over_time(nightowl_telemetry_value{key=\"S1\"}[8d]) + 0.1)",
+            "legendFormat": "Z-Score",
+            "refId": "A"
           }
         ],
         "options": {
-          "showHeader": true,
-          "sortBy": []
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"]
+          },
+          "textMode": "value_and_name",
+          "graphMode": "area",
+          "colorMode": "background",
+          "orientation": "auto"
         },
         "fieldConfig": {
           "defaults": {
-            "custom": {
-              "align": "left",
-              "filterable": false,
-              "width": null
-            },
+            "unit": "none",
+            "decimals": 2,
             "thresholds": {
               "mode": "absolute",
               "steps": [
                 {"value": null, "color": "green"},
-                {"value": 1, "color": "red"}
+                {"value": 2.0, "color": "yellow"},
+                {"value": 2.5, "color": "red"}
+              ]
+            },
+            "mappings": []
+          }
+        },
+        "description": "Pressure drop severity: <2.0σ = Normal, 2.0-2.5σ = Watch, >2.5σ = Alert"
+      },
+      {
+        "id": 12,
+        "title": "Excessive Pump Runtime",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 12, "y": 24},
+        "datasource": {"uid": "af1z6oz34c7b4f", "type": "prometheus"},
+        "targets": [
+          {
+            "expr": "(avg_over_time(nightowl_telemetry_value{key=\"P1C1\"}[1h]) - avg_over_time(nightowl_telemetry_value{key=\"P1C1\"}[8d])) / (stddev_over_time(nightowl_telemetry_value{key=\"P1C1\"}[8d]) + 0.01)",
+            "legendFormat": "Z-Score",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"]
+          },
+          "textMode": "value_and_name",
+          "graphMode": "area",
+          "colorMode": "background",
+          "orientation": "auto"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "none",
+            "decimals": 2,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": null, "color": "green"},
+                {"value": 2.0, "color": "yellow"},
+                {"value": 2.5, "color": "red"}
+              ]
+            },
+            "mappings": []
+          }
+        },
+        "description": "Pump activity anomaly: <2.0σ = Normal, 2.0-2.5σ = Watch, >2.5σ = Alert"
+      },
+      {
+        "id": 13,
+        "title": "Night Pump Activity (11pm-5am)",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 18, "y": 24},
+        "datasource": {"uid": "af1z6oz34c7b4f", "type": "prometheus"},
+        "targets": [
+          {
+            "expr": "nightowl_telemetry_value{key=\"P1C1\"}",
+            "legendFormat": "Current (A)",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"]
+          },
+          "textMode": "value_and_name",
+          "graphMode": "area",
+          "colorMode": "background",
+          "orientation": "auto"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "amp",
+            "decimals": 2,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": null, "color": "green"},
+                {"value": 0.5, "color": "red"}
+              ]
+            },
+            "mappings": []
+          }
+        },
+        "description": "Night pump activity (11pm-5am): <0.5A = Off/Normal, >0.5A = Running/Alert"
+      },
+      {
+        "id": 14,
+        "title": "Rapid Level Drop",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 6, "y": 28},
+        "datasource": {"uid": "af1z6oz34c7b4f", "type": "prometheus"},
+        "targets": [
+          {
+            "expr": "nightowl_telemetry_value{key=\"Level1_precent\"} or vector(0)",
+            "legendFormat": "Level (%)",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"]
+          },
+          "textMode": "value_and_name",
+          "graphMode": "none",
+          "colorMode": "value",
+          "orientation": "auto"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "decimals": 1,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": null, "color": "gray"}
               ]
             },
             "mappings": [
-              {"type": "value", "value": "0", "text": "✓ Normal"},
-              {"type": "value", "value": "100", "text": "⚠️ ALERT"}
+              {"type": "special", "options": {"match": "null"}, "result": {"text": "Awaiting Data", "color": "text"}}
             ],
-            "color": {
-              "mode": "thresholds"
-            }
-          },
-          "overrides": [
-            {
-              "matcher": {"id": "byName", "options": "indicator"},
-              "properties": [
-                {"id": "custom.width", "value": 300},
-                {"id": "displayName", "value": "Indicator"}
-              ]
-            },
-            {
-              "matcher": {"id": "byName", "options": "Value"},
-              "properties": [
-                {"id": "custom.width", "value": 150},
-                {"id": "displayName", "value": "Status"},
-                {"id": "custom.cellOptions", "value": {"type": "color-background"}}
-              ]
-            }
-          ]
+            "noValue": "Awaiting Data"
+          }
         },
-        "transformations": [
+        "description": "Water level % (requires Level1_precent metric - not yet available)"
+      },
+      {
+        "id": 17,
+        "title": "Daily Water Usage",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 12, "y": 28},
+        "datasource": {"uid": "af1z6oz34c7b4f", "type": "prometheus"},
+        "targets": [
           {
-            "id": "organize",
-            "options": {
-              "excludeByName": {
-                "Time": true,
-                "__name__": true,
-                "job": true,
-                "instance": true,
-                "device_id": true,
-                "device_name": true,
-                "key": true
-              },
-              "indexByName": {
-                "indicator": 0,
-                "Value": 1
-              },
-              "renameByName": {
-                "indicator": "Leak Indicator",
-                "Value": "Status"
-              }
-            }
-          },
-          {
-            "id": "sortBy",
-            "options": {
-              "fields": {},
-              "sort": [
-                {
-                  "field": "Status",
-                  "desc": true
-                }
-              ]
-            }
+            "expr": "increase(nightowl_telemetry_value{key=\"Pulse_TotalGallons\"}[24h]) or vector(0)",
+            "legendFormat": "Gallons/day",
+            "refId": "A"
           }
         ],
-        "description": "Leak detection indicators: Green = Normal, Red = Alert condition detected"
+        "options": {
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"]
+          },
+          "textMode": "value_and_name",
+          "graphMode": "none",
+          "colorMode": "value",
+          "orientation": "auto"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "decimals": 1,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": null, "color": "gray"}
+              ]
+            },
+            "mappings": [
+              {"type": "special", "options": {"match": "null"}, "result": {"text": "Awaiting Data", "color": "text"}}
+            ],
+            "noValue": "Awaiting Data"
+          }
+        },
+        "description": "24-hour water usage (requires Pulse_TotalGallons metric - not yet available)"
       },
       {
         "id": 15,
@@ -612,27 +693,21 @@
       },
       {
         "id": 16,
-        "title": "Prometheus Alert Status",
+        "title": "NightOwl Alert Status",
         "type": "table",
         "gridPos": {"h": 8, "w": 24, "x": 0, "y": 36},
         "datasource": {"uid": "af1z6oz34c7b4f", "type": "prometheus"},
         "targets": [
           {
-            "expr": "ALERTS{alertname=~\"NightOwl.*\"}",
-            "legendFormat": "",
-            "refId": "A",
+            "expr": "(label_replace(max(ALERTS{alertname=\"NightOwlLeakDetectedCritical\"}) or vector(0), \"alert_name\", \"🔴 Critical Leak (≥70%)\", \"\", \"\")) or (label_replace(max(ALERTS{alertname=\"NightOwlLeakDetectedWarning\"}) or vector(0), \"alert_name\", \"🟡 Leak Warning (50-70%)\", \"\", \"\")) or (label_replace(max(ALERTS{alertname=\"NightOwlExcessiveUsageAnomaly\"}) or vector(0), \"alert_name\", \"💧 Excessive Usage\", \"\", \"\")) or (label_replace(max(ALERTS{alertname=\"NightOwlPumpRuntimeAnomaly\"}) or vector(0), \"alert_name\", \"⚡ Pump Runtime High\", \"\", \"\")) or (label_replace(max(ALERTS{alertname=\"NightOwlNightPumpActivity\"}) or vector(0), \"alert_name\", \"🌙 Night Pump Activity\", \"\", \"\")) or (label_replace(max(ALERTS{alertname=\"NightOwlLevelDropAnomaly\"}) or vector(0), \"alert_name\", \"📉 Rapid Level Drop\", \"\", \"\")) or (label_replace(max(ALERTS{alertname=\"NightOwlPressureDropAnomaly\"}) or vector(0), \"alert_name\", \"📊 Pressure Drop\", \"\", \"\")) or (label_replace(max(ALERTS{alertname=\"NightOwlMissingLevelData\"}) or vector(0), \"alert_name\", \"⚠️ Missing Level Data\", \"\", \"\"))",
             "format": "table",
+            "refId": "A",
             "instant": true
           }
         ],
         "options": {
           "showHeader": true,
-          "sortBy": [
-            {
-              "displayName": "State",
-              "desc": true
-            }
-          ]
+          "sortBy": []
         },
         "fieldConfig": {
           "defaults": {
@@ -643,89 +718,57 @@
           },
           "overrides": [
             {
-              "matcher": {"id": "byName", "options": "Alert Name"},
+              "matcher": {"id": "byName", "options": "alert_name"},
               "properties": [
-                {"id": "custom.width", "value": 300}
+                {"id": "custom.width", "value": 400},
+                {"id": "displayName", "value": "Alert"}
               ]
             },
             {
-              "matcher": {"id": "byName", "options": "State"},
+              "matcher": {"id": "byName", "options": "Value"},
               "properties": [
-                {"id": "custom.width", "value": 100},
+                {"id": "custom.width", "value": 150},
+                {"id": "displayName", "value": "Firing"},
                 {"id": "mappings", "value": [
-                  {
-                    "type": "value",
-                    "value": "firing",
-                    "text": "🔴 FIRING",
-                    "color": "red"
-                  },
-                  {
-                    "type": "value",
-                    "value": "pending",
-                    "text": "🟡 Pending",
-                    "color": "yellow"
-                  },
-                  {
-                    "type": "value",
-                    "value": "inactive",
-                    "text": "✓ OK",
-                    "color": "green"
-                  }
+                  {"type": "value", "value": "0", "text": "❌ Not Firing"},
+                  {"type": "value", "value": "1", "text": "🟡 Pending"},
+                  {"type": "value", "value": "2", "text": "✅ FIRING"}
                 ]},
-                {"id": "custom.cellOptions", "value": {"type": "color-background"}}
-              ]
-            },
-            {
-              "matcher": {"id": "byName", "options": "Severity"},
-              "properties": [
-                {"id": "custom.width", "value": 100},
-                {"id": "mappings", "value": [
-                  {
-                    "type": "value",
-                    "value": "critical",
-                    "text": "🔴 Critical"
-                  },
-                  {
-                    "type": "value",
-                    "value": "warning",
-                    "text": "🟡 Warning"
-                  }
-                ]},
-                {"id": "custom.cellOptions", "value": {"type": "color-text"}}
-              ]
-            },
-            {
-              "matcher": {"id": "byName", "options": "Description"},
-              "properties": [
-                {"id": "custom.width", "value": 400}
+                {"id": "custom.cellOptions", "value": {"type": "color-background"}},
+                {"id": "thresholds", "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {"value": null, "color": "green"},
+                    {"value": 1, "color": "yellow"},
+                    {"value": 2, "color": "red"}
+                  ]
+                }}
               ]
             }
           ]
         },
         "transformations": [
           {
+            "id": "merge",
+            "options": {}
+          },
+          {
             "id": "organize",
             "options": {
               "excludeByName": {
                 "Time": true,
-                "Value": true,
                 "__name__": true,
-                "job": true,
+                "alertname": true,
+                "alertstate": true,
                 "instance": true,
-                "component": true,
-                "alert_type": true
+                "job": true
               },
               "indexByName": {
-                "alertname": 0,
-                "alertstate": 1,
-                "severity": 2,
-                "device_name": 3
+                "alert_name": 0,
+                "Value": 1
               },
               "renameByName": {
-                "alertname": "Alert Name",
-                "alertstate": "State",
-                "severity": "Severity",
-                "device_name": "Device"
+                "alert_name": "Alert"
               }
             }
           },
@@ -735,14 +778,13 @@
               "fields": {},
               "sort": [
                 {
-                  "field": "State",
-                  "desc": true
+                  "field": "Alert"
                 }
               ]
             }
           }
         ],
-        "description": "Status of all configured NightOwl Prometheus alerts. Green = OK, Yellow = Pending, Red = Firing"
+        "description": "Status of all NightOwl Prometheus alerts. ❌ Not Firing (green), 🟡 Pending (yellow), ✅ FIRING (red)"
       }
     ]
   },
