@@ -52,7 +52,7 @@ spec:
               key: tenant
               optional: true
         - name: NIGHTOWL_BASE_URL
-          value: "https://portal.nightowlmonitoring.com"
+          value: "https://portal.watersystem.live"
         - name: NIGHTOWL_POLL_INTERVAL_SECONDS
           value: "60"
         - name: NIGHTOWL_PAGE_SIZE
