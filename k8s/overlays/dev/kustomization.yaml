@@ -1,0 +1,41 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: nightowl
+
+resources:
+  - ../../base
+
+# Dev-specific image replacements (use local builds)
+images:
+  - name: registry.olympusdrive.com/nightowl-monitor
+    newName: nightowl-monitor
+    newTag: dev
+
+# Patches for dev environment
+patches:
+  # Change service to LoadBalancer for easy local access
+  - patch: |-
+      - op: replace
+        path: /spec/type
+        value: LoadBalancer
+    target:
+      kind: Service
+      name: nightowl-monitor
+
+  # Use IfNotPresent for local images
+  - patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/imagePullPolicy
+        value: IfNotPresent
+    target:
+      kind: Deployment
+      name: nightowl-monitor
+
+# Create dev secrets
+secretGenerator:
+  - name: nightowl-secret
+    literals:
+      - username=dev_user
+      - password=dev_password
+      - tenant=dev_tenant
