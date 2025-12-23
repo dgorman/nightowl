@@ -138,88 +138,165 @@ Well_Level-1, Level1_precent, Pulse_TotalGallons
 
 ## Machine Learning Leak Detection
 
-NightOwl Monitor includes an optional ML-based leak detection system using Isolation Forest for unsupervised anomaly detection. This provides more sophisticated detection compared to pure statistical z-score analysis.
+NightOwl Monitor includes an intelligent leak detection system that learns what "normal" looks like for your water system and alerts you when something seems off.
 
-### How It Works
+### How It Works (Plain English)
+
+Imagine you've been watching your water system every day for a month. After a while, you'd start to notice patterns:
+- The pressure usually stays between 40-55 PSI
+- The pump kicks on about 6 times during the day
+- Pressure drops a little at night when no one's using water
+- On weekends, usage patterns are different
+
+**That's exactly what our ML model does—but it watches thousands of data points instead of just a few.**
+
+Here's the process in simple terms:
+
+1. **Learning Phase**: We show the model a month's worth of normal operation data. It studies the patterns: pressure readings, pump activity, voltage levels, time of day, day of week. It learns what "normal" looks like for YOUR specific system.
+
+2. **Watching for Oddities**: Once trained, the model continuously compares current readings against what it learned. It asks: "Does this look like something I've seen before, or is this unusual?"
+
+3. **Scoring Weirdness**: The model gives each reading an "anomaly score." Think of it like a weirdness meter:
+   - **0-20%**: "This looks totally normal"
+   - **20-50%**: "Slightly unusual, but probably fine"
+   - **50-80%**: "This is odd—worth watching"
+   - **80-100%**: "This doesn't match anything I've seen—possible leak!"
+
+4. **Smart Context**: The model doesn't just look at one number. It considers:
+   - Is the pressure dropping while the pump is off? (leak indicator)
+   - Is this happening at 3 AM when no one should be using water?
+   - How does the current reading compare to the last hour? The last 6 hours? The last day?
+
+### Why ML Instead of Simple Thresholds?
+
+You might ask: "Why not just alert when pressure drops below 40 PSI?"
+
+Simple thresholds miss context. For example:
+- Pressure at 38 PSI at 3 AM with the pump off = **probably a leak**
+- Pressure at 38 PSI at 7 AM when everyone's showering = **completely normal**
+
+The ML model understands this difference because it learned from real patterns, not arbitrary numbers.
+
+### What You'll See
+
+When the system detects something unusual, you'll see warnings like:
+
+```
+ML ANOMALY DETECTED for 3701155: probability=82.7%, score=-0.044
+```
+
+This means:
+- The current readings look 82.7% "unusual" compared to normal patterns
+- The negative score confirms it's flagged as an anomaly
+- You should check the system—could be a leak, or could be unusual but legitimate usage
+
+### Understanding the Probability
+
+| Probability | What It Means | Action |
+|------------|---------------|--------|
+| 0-30% | Normal operation | None needed |
+| 30-50% | Slightly unusual | Keep an eye on it |
+| 50-70% | Moderately unusual | Check recent usage patterns |
+| 70-90% | Significantly unusual | Inspect the system |
+| 90-100% | Highly abnormal | Investigate immediately |
+
+**Important**: A high probability doesn't guarantee a leak—it means the readings don't match typical patterns. It could be:
+- An actual leak
+- Unusual but legitimate water usage (filling a pool, guests visiting)
+- A sensor issue
+- Seasonal changes the model hasn't seen yet
+
+### Model Confidence
+
+The system also reports confidence based on how much training data it has:
+
+- **Low confidence**: Less than 5,000 training samples—model is still learning
+- **Medium confidence**: 5,000-20,000 samples—model is reasonably trained
+- **High confidence**: 20,000+ samples—model has seen many patterns
+
+---
+
+### Technical Details (For Developers)
+
+<details>
+<summary>Click to expand technical documentation</summary>
+
+#### How It Works (Technical)
 
 1. **Training Phase**: The model trains on historical telemetry data from Prometheus (recommended: 30+ days)
-2. **Feature Engineering**: Raw telemetry is transformed into ML features:
+2. **Feature Engineering**: Raw telemetry is transformed into 52 ML features:
    - Rolling window statistics (mean, std, range) at 5m, 15m, 1h, 6h, 24h windows
-   - Rate-of-change features
-   - Time-based features (hour of day, day of week, is_night, is_weekend)
-   - Pump-specific features (duty cycle, level drop while pump off)
+   - Rate-of-change features (1m, 5m, 60m deltas)
+   - Cyclical time features (hour_sin, hour_cos, dow_sin, dow_cos)
+   - Binary time features (is_night, is_weekend)
+   - Pump-specific features (pump_running, pump_cycle_count_1h)
 3. **Anomaly Detection**: Isolation Forest identifies patterns that don't match "normal" behavior
 4. **Metrics Export**: Results are exposed as Prometheus metrics for dashboards and alerting
 
-### ML Configuration
+#### Algorithm: Isolation Forest
+
+We use [Isolation Forest](https://scikit-learn.org/stable/modules/generated/sklearn.ensemble.IsolationForest.html), an unsupervised anomaly detection algorithm. It works by:
+
+1. Randomly selecting a feature and a split value
+2. Recursively partitioning data until points are "isolated"
+3. Anomalies are isolated faster (fewer splits needed) because they're different from the majority
+
+Key parameters:
+- `contamination=0.05` — Assumes ~5% of training data contains anomalies
+- `n_estimators=100` — Uses 100 isolation trees
+- `random_state=42` — Reproducible results
+
+#### ML Configuration
 
 | Variable | Default | Description |
 | --- | --- | --- |
 | `NIGHTOWL_ML_ENABLED` | `false` | Enable ML leak detection |
-| `NIGHTOWL_ML_MODEL_PATH` | `/var/lib/nightowl/models/leak_detector.joblib` | Path to trained model file |
-| `NIGHTOWL_ML_PROMETHEUS_URL` | `http://localhost:9090` | Prometheus URL for fetching training/inference data |
+| `NIGHTOWL_ML_MODEL_PATH` | `/app/models/leak_detector.joblib` | Path to trained model file |
+| `NIGHTOWL_ML_PROMETHEUS_URL` | `http://prometheus:9090` | Prometheus URL for fetching inference data |
 | `NIGHTOWL_ML_INFERENCE_INTERVAL` | `5` | Run ML inference every N poll cycles |
 
-### Training the Model
+#### Training the Model
 
 ```bash
-# Install ML dependencies
+# Install dependencies
 pip install -r requirements.txt
 
-# Train on 30 days of production data (via SSH tunnel to Prometheus)
-ssh -L 9090:prometheus:9090 node01.olympusdrive.com &
-python scripts/train_ml_model.py --days 30
+# Train from Grafana Cloud (production data)
+python scripts/train_ml_model.py \
+  --prometheus-url https://prometheus-prod-13-prod-us-east-0.grafana.net/api/prom \
+  --username 1953220 \
+  --password "$GRAFANA_CLOUD_READ_TOKEN" \
+  --days 30
 
-# Or train on specific device
-python scripts/train_ml_model.py --device-id "your-device-id" --days 30
+# Or train from local Prometheus
+python scripts/train_ml_model.py --prometheus-url http://localhost:9090 --days 30
 ```
 
-Training output:
-```
-NightOwl ML Leak Detector - Training Script
-============================================================
-Prometheus URL: http://localhost:9090
-Training days: 30
-Training complete. Anomaly rate: 4.87%
-Model saved to: /var/lib/nightowl/models/leak_detector.joblib
-```
-
-### ML Prometheus Metrics
+#### ML Prometheus Metrics
 
 | Metric | Type | Description |
 | --- | --- | --- |
 | `nightowl_ml_leak_probability` | Gauge | ML leak probability (0-100%) |
-| `nightowl_ml_anomaly_score` | Gauge | Isolation Forest score (negative = anomaly) |
+| `nightowl_ml_anomaly_score` | Gauge | Isolation Forest decision score (negative = anomaly) |
 | `nightowl_ml_is_anomaly` | Gauge | Binary flag (1 = anomaly detected) |
 | `nightowl_ml_model_confidence` | Gauge | Model confidence (0=low, 1=medium, 2=high) |
-| `nightowl_ml_feature_contribution` | Gauge | Feature contributions to anomaly score |
+| `nightowl_ml_feature_contribution` | Gauge | Per-feature contribution to anomaly score |
+| `nightowl_ml_feature_value` | Gauge | Current feature values used in prediction |
+| `nightowl_ml_inference_timestamp` | Gauge | Unix timestamp of last inference |
 | `nightowl_ml_inferences_total` | Counter | Total inference runs by status |
 
-### ML Grafana Dashboard
-
-Import `grafana/nightowl-ml-dashboard.json` for ML-specific visualizations:
-
-- **ML Leak Probability Gauge** - Current leak probability from ML model
-- **ML vs Stats Comparison** - Side-by-side view of both detection methods
-- **Anomaly Score Trend** - Historical ML anomaly scores
-- **Feature Contributions** - Which features are driving the current prediction
-- **Model Health** - Is the ML model running and producing fresh predictions?
-
-### ML vs Statistical Detection
+#### ML vs Statistical Detection
 
 | Aspect | Statistical (Z-Score) | ML (Isolation Forest) |
 | --- | --- | --- |
 | Training Required | No | Yes (30+ days recommended) |
 | Labeled Data Needed | No | No |
-| Multi-variate | Limited | Yes |
+| Multi-variate | Limited | Yes (52 features) |
 | Time Awareness | Basic | Advanced (rolling windows) |
 | Interpretability | High | Medium (feature contributions) |
-| False Positives | Moderate | Lower |
+| False Positives | Moderate | Lower with sufficient training |
 
-The system uses both methods and provides combined metrics:
-- `nightowl:combined_leak_probability` - Weighted combination (60% ML, 40% stats)
-- `nightowl:combined_leak_detected` - Either method detecting a leak
-- `nightowl:high_confidence_leak` - Both methods agree with high confidence
+</details>
 
 ## Kubernetes Deployment
 
