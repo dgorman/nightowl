@@ -585,22 +585,17 @@ class PrometheusDataFetcher:
         
         Args:
             device_id: NightOwl device ID
-            days: Number of days to look back
+            days: Number of days to look back (unused, kept for API compatibility)
             
         Returns:
             List of available telemetry keys
         """
         import requests
         
-        end_time = datetime.utcnow()
-        start_time = end_time - timedelta(days=days)
-        
-        url = f"{self.prometheus_url}/api/v1/query_range"
+        # Use instant query to find all current keys for this device
+        url = f"{self.prometheus_url}/api/v1/query"
         params = {
-            "query": f'count by (key) (nightowl_telemetry_value{{device_id="{device_id}"}})',
-            "start": start_time.timestamp(),
-            "end": end_time.timestamp(),
-            "step": "1d",
+            "query": f'group by (key) (nightowl_telemetry_value{{device_id="{device_id}"}})',
         }
         
         try:
@@ -612,6 +607,7 @@ class PrometheusDataFetcher:
             return []
         
         if data.get("status") != "success":
+            logger.warning(f"Prometheus query failed: {data.get('error', 'unknown')}")
             return []
         
         results = data.get("data", {}).get("result", [])
@@ -621,18 +617,18 @@ class PrometheusDataFetcher:
     def fetch_training_data(
         self,
         device_id: str,
-        days: int = 30,
+        days: float = 30,
         telemetry_keys: Optional[List[str]] = None,
-        step: str = "5m",
+        step: Optional[str] = None,
     ) -> pd.DataFrame:
         """
         Fetch training data for a specific device.
         
         Args:
             device_id: NightOwl device ID
-            days: Number of days of historical data to fetch
+            days: Number of days of historical data to fetch (can be fractional)
             telemetry_keys: List of telemetry keys to fetch. If None, discovers available keys.
-            step: Query resolution step
+            step: Query resolution step (if None, auto-calculated based on days)
             
         Returns:
             DataFrame ready for training
@@ -647,8 +643,19 @@ class PrometheusDataFetcher:
 
         end_time = datetime.utcnow()
         start_time = end_time - timedelta(days=days)
+        
+        # Auto-calculate step size if not provided
+        if step is None:
+            if days <= 0.5:  # 12 hours or less
+                step = "1m"
+            elif days <= 1:  # 1 day or less
+                step = "1m"
+            elif days <= 7:  # 1 week or less
+                step = "5m"
+            else:
+                step = "5m"  # Default for longer periods
 
-        logger.info(f"Fetching {days} days of training data for device {device_id}")
+        logger.info(f"Fetching {days} days of training data for device {device_id} (step={step})")
 
         # Fetch each telemetry key
         dfs = []
