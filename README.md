@@ -135,3 +135,210 @@ Summary keys shown in the logs (override with `NIGHTOWL_SUMMARY_KEYS`):
 ```text
 Well_Level-1, Level1_precent, Pulse_TotalGallons
 ```
+
+## Machine Learning Leak Detection
+
+NightOwl Monitor includes an optional ML-based leak detection system using Isolation Forest for unsupervised anomaly detection. This provides more sophisticated detection compared to pure statistical z-score analysis.
+
+### How It Works
+
+1. **Training Phase**: The model trains on historical telemetry data from Prometheus (recommended: 30+ days)
+2. **Feature Engineering**: Raw telemetry is transformed into ML features:
+   - Rolling window statistics (mean, std, range) at 5m, 15m, 1h, 6h, 24h windows
+   - Rate-of-change features
+   - Time-based features (hour of day, day of week, is_night, is_weekend)
+   - Pump-specific features (duty cycle, level drop while pump off)
+3. **Anomaly Detection**: Isolation Forest identifies patterns that don't match "normal" behavior
+4. **Metrics Export**: Results are exposed as Prometheus metrics for dashboards and alerting
+
+### ML Configuration
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `NIGHTOWL_ML_ENABLED` | `false` | Enable ML leak detection |
+| `NIGHTOWL_ML_MODEL_PATH` | `/var/lib/nightowl/models/leak_detector.joblib` | Path to trained model file |
+| `NIGHTOWL_ML_PROMETHEUS_URL` | `http://localhost:9090` | Prometheus URL for fetching training/inference data |
+| `NIGHTOWL_ML_INFERENCE_INTERVAL` | `5` | Run ML inference every N poll cycles |
+
+### Training the Model
+
+```bash
+# Install ML dependencies
+pip install -r requirements.txt
+
+# Train on 30 days of production data (via SSH tunnel to Prometheus)
+ssh -L 9090:prometheus:9090 node01.olympusdrive.com &
+python scripts/train_ml_model.py --days 30
+
+# Or train on specific device
+python scripts/train_ml_model.py --device-id "your-device-id" --days 30
+```
+
+Training output:
+```
+NightOwl ML Leak Detector - Training Script
+============================================================
+Prometheus URL: http://localhost:9090
+Training days: 30
+Training complete. Anomaly rate: 4.87%
+Model saved to: /var/lib/nightowl/models/leak_detector.joblib
+```
+
+### ML Prometheus Metrics
+
+| Metric | Type | Description |
+| --- | --- | --- |
+| `nightowl_ml_leak_probability` | Gauge | ML leak probability (0-100%) |
+| `nightowl_ml_anomaly_score` | Gauge | Isolation Forest score (negative = anomaly) |
+| `nightowl_ml_is_anomaly` | Gauge | Binary flag (1 = anomaly detected) |
+| `nightowl_ml_model_confidence` | Gauge | Model confidence (0=low, 1=medium, 2=high) |
+| `nightowl_ml_feature_contribution` | Gauge | Feature contributions to anomaly score |
+| `nightowl_ml_inferences_total` | Counter | Total inference runs by status |
+
+### ML Grafana Dashboard
+
+Import `grafana/nightowl-ml-dashboard.json` for ML-specific visualizations:
+
+- **ML Leak Probability Gauge** - Current leak probability from ML model
+- **ML vs Stats Comparison** - Side-by-side view of both detection methods
+- **Anomaly Score Trend** - Historical ML anomaly scores
+- **Feature Contributions** - Which features are driving the current prediction
+- **Model Health** - Is the ML model running and producing fresh predictions?
+
+### ML vs Statistical Detection
+
+| Aspect | Statistical (Z-Score) | ML (Isolation Forest) |
+| --- | --- | --- |
+| Training Required | No | Yes (30+ days recommended) |
+| Labeled Data Needed | No | No |
+| Multi-variate | Limited | Yes |
+| Time Awareness | Basic | Advanced (rolling windows) |
+| Interpretability | High | Medium (feature contributions) |
+| False Positives | Moderate | Lower |
+
+The system uses both methods and provides combined metrics:
+- `nightowl:combined_leak_probability` - Weighted combination (60% ML, 40% stats)
+- `nightowl:combined_leak_detected` - Either method detecting a leak
+- `nightowl:high_confidence_leak` - Both methods agree with high confidence
+
+## Kubernetes Deployment
+
+### Development (Docker Desktop)
+
+```bash
+# Build local image
+docker build -t nightowl-monitor:dev .
+
+# Deploy to Docker Desktop K8s
+kubectl apply -k k8s/overlays/dev
+
+# Check status
+kubectl get pods -n nightowl
+kubectl logs -n nightowl deployment/nightowl-monitor
+```
+
+**Note**: Dev deployment does NOT push metrics to Grafana Cloud to prevent polluting production data.
+
+### Production (MicroK8s)
+
+```bash
+# SSH to prod and pull latest changes
+ssh dgorman@node01.olympusdrive.com
+cd /home/dgorman/Apps/nightowl
+git pull
+
+# Apply Grafana Cloud secrets (one-time setup)
+kubectl apply -f monitoring/k8s/grafana-cloud-secrets.yaml
+kubectl apply -f monitoring/k8s/grafana-cloud-solardashboard-secret.yaml
+
+# Update Prometheus deployment to mount secrets
+kubectl patch deployment prometheus -n solardashboard \
+  --patch-file monitoring/k8s/prometheus-secrets-patch.yaml
+
+# Apply Prometheus config
+kubectl apply -f monitoring/k8s/prometheus-configmap.yaml
+
+# Deploy NightOwl
+kubectl apply -k k8s/overlays/prod
+kubectl rollout restart deployment/nightowl-monitor -n nightowl
+```
+
+## Grafana Cloud Integration
+
+NightOwl metrics are pushed to Grafana Cloud via Prometheus remote_write.
+
+### Tokens
+
+Tokens are stored as Kubernetes secrets in the `solardashboard` namespace:
+
+| Secret | Key | Purpose |
+| --- | --- | --- |
+| `grafana-cloud-nightowl` | `write-token` | Prometheus remote_write for nightowl_* metrics |
+| `grafana-cloud-nightowl` | `read-token` | ML training script data queries |
+| `grafana-cloud-solardashboard` | `write-token` | Prometheus remote_write for solar metrics |
+
+### Training with Grafana Cloud
+
+```bash
+# Get read token from secret
+READ_TOKEN=$(kubectl get secret grafana-cloud-nightowl -n solardashboard \
+  -o jsonpath='{.data.read-token}' | base64 -d)
+
+# Train ML model using Grafana Cloud historical data
+python scripts/train_ml_model.py \
+  --prometheus-url "https://prometheus-prod-13-prod-us-east-0.grafana.net/api/prom" \
+  --username "1953220" \
+  --password "$READ_TOKEN" \
+  --days 30 \
+  --model-path models/leak_detector.joblib
+```
+
+### Available Telemetry in Grafana Cloud
+
+| Key | Description | Data Availability |
+| --- | --- | --- |
+| `P1C1`, `P1C2`, `P1C3` | Pump 1 phase currents (Amps) | ✅ |
+| `P1V1`, `P1V2`, `P1V3` | Pump 1 phase voltages (Volts) | ✅ |
+| `P1Hz` | Pump 1 frequency (Hz) | ✅ |
+| `S1` | Pressure sensor 1 (PSI) | ✅ |
+| `Level1_precent` | Water level percentage | ❌ (not available on all systems) |
+| `Pulse_TotalGallons` | Flow meter total | ❌ (not available on all systems) |
+
+## Monitoring Stack Architecture
+
+```
+┌─────────────────────┐     ┌──────────────────────┐
+│   NightOwl API      │────▶│  NightOwl Monitor    │
+│ (portal.watersystem │     │   (Python poller)    │
+│       .live)        │     │  - Metrics export    │
+└─────────────────────┘     │  - ML inference      │
+                            └──────────┬───────────┘
+                                       │ :8010
+                                       ▼
+┌─────────────────────┐     ┌──────────────────────┐     ┌─────────────────┐
+│     Prometheus      │────▶│   Grafana Cloud      │────▶│    Grafana      │
+│  (solardashboard    │     │   (remote_write)     │     │   Dashboards    │
+│    namespace)       │     └──────────────────────┘     └─────────────────┘
+└─────────────────────┘
+        │
+        ▼ query
+┌─────────────────────┐
+│  ML Training Script │
+│  (fetch historical  │
+│   data for model)   │
+└─────────────────────┘
+```
+
+## Files Reference
+
+| Path | Description |
+| --- | --- |
+| `src/nightowl_monitor/` | Python source code |
+| `src/nightowl_monitor/ml_leak_detector.py` | ML leak detection module |
+| `scripts/train_ml_model.py` | ML model training script |
+| `models/leak_detector.joblib` | Trained ML model (gitignored) |
+| `k8s/base/` | Base Kubernetes manifests |
+| `k8s/overlays/dev/` | Dev-specific patches (Docker Desktop) |
+| `k8s/overlays/prod/` | Prod-specific patches (MicroK8s) |
+| `monitoring/k8s/` | Prometheus/Grafana config for prod |
+| `grafana/` | Grafana dashboard JSON files |

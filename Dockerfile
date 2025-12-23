@@ -11,6 +11,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY src ./src
 
+# Copy trained ML models if they exist
+COPY models ./models
+
 ENV PYTHONPATH=/app/src
 
 CMD ["python", "-m", "nightowl_monitor"]

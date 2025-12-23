@@ -72,6 +72,11 @@ class Settings:
     summary_keys: Tuple[str, ...]
     metrics_host: str
     metrics_port: int
+    # ML settings
+    ml_enabled: bool
+    ml_model_path: Optional[str]
+    ml_prometheus_url: Optional[str]
+    ml_inference_interval: int  # Run ML inference every N poll cycles
 
     @staticmethod
     def from_env(env: Optional[dict[str, str]] = None) -> "Settings":
@@ -130,6 +135,20 @@ class Settings:
         if not (1 <= metrics_port <= 65535):
             raise SettingsError("NIGHTOWL_METRICS_PORT must be between 1 and 65535")
 
+        # ML configuration
+        ml_enabled = source.get("NIGHTOWL_ML_ENABLED", "false").lower() in ("true", "1", "yes")
+        ml_model_path = source.get("NIGHTOWL_ML_MODEL_PATH")
+        ml_prometheus_url = source.get("NIGHTOWL_ML_PROMETHEUS_URL", "http://localhost:9090")
+        
+        ml_inference_interval_raw = source.get("NIGHTOWL_ML_INFERENCE_INTERVAL", "5")
+        try:
+            ml_inference_interval = int(ml_inference_interval_raw)
+        except ValueError as exc:
+            raise SettingsError("NIGHTOWL_ML_INFERENCE_INTERVAL must be an integer") from exc
+        
+        if ml_inference_interval < 1:
+            ml_inference_interval = 1
+
         return Settings(
             username=username,
             password=password,
@@ -142,6 +161,10 @@ class Settings:
             summary_keys=summary_keys,
             metrics_host=metrics_host,
             metrics_port=metrics_port,
+            ml_enabled=ml_enabled,
+            ml_model_path=ml_model_path,
+            ml_prometheus_url=ml_prometheus_url,
+            ml_inference_interval=ml_inference_interval,
         )
 
 

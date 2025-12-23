@@ -32,6 +32,29 @@ patches:
       kind: Deployment
       name: nightowl-monitor
 
+  # Add ML configuration environment variables
+  # Note: ML_PROMETHEUS_URL is NOT set in dev - ML inference uses real-time telemetry only
+  # This prevents dev from querying/affecting prod Prometheus/Grafana Cloud
+  - patch: |-
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: NIGHTOWL_ML_ENABLED
+          value: "true"
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: NIGHTOWL_ML_MODEL_PATH
+          value: "/app/models/leak_detector.joblib"
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: NIGHTOWL_ML_INFERENCE_INTERVAL
+          value: "5"
+    target:
+      kind: Deployment
+      name: nightowl-monitor
+
 # Create dev secrets (using production credentials)
 secretGenerator:
   - name: nightowl-secret

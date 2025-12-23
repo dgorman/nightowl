@@ -6,6 +6,8 @@ import logging
 import signal
 import sys
 import threading
+from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
 from .client import ApiError, AuthError, DeviceSnapshot, NightOwlClient
@@ -13,6 +15,15 @@ from .config import Settings, SettingsError
 from .metrics import MetricsService
 
 _LOGGER = logging.getLogger("nightowl.monitor")
+
+# ML imports (optional, graceful fallback if not installed)
+try:
+    import pandas as pd
+    from .ml_leak_detector import MLLeakDetector, PrometheusDataFetcher
+    ML_AVAILABLE = True
+except ImportError:
+    ML_AVAILABLE = False
+    _LOGGER.warning("ML dependencies not available. Install scikit-learn, pandas, numpy for ML features.")
 
 
 def _configure_logging() -> None:
@@ -72,6 +83,28 @@ def run_polling_loop(settings: Settings) -> None:
         settings.metrics_port,
     )
 
+    # Initialize ML detector if enabled
+    ml_detector: Optional["MLLeakDetector"] = None
+    data_fetcher: Optional["PrometheusDataFetcher"] = None
+    poll_count = 0
+    
+    if settings.ml_enabled and ML_AVAILABLE:
+        _LOGGER.info("ML leak detection enabled")
+        model_path = Path(settings.ml_model_path) if settings.ml_model_path else None
+        ml_detector = MLLeakDetector(model_path=model_path)
+        
+        # Try to load existing model
+        if ml_detector.load():
+            _LOGGER.info("Loaded pre-trained ML model")
+        else:
+            _LOGGER.warning("No pre-trained ML model found. Run training script to enable ML predictions.")
+            ml_detector = None
+            
+        if settings.ml_prometheus_url:
+            data_fetcher = PrometheusDataFetcher(prometheus_url=settings.ml_prometheus_url)
+    elif settings.ml_enabled and not ML_AVAILABLE:
+        _LOGGER.error("ML enabled but dependencies not installed. Run: pip install scikit-learn pandas numpy")
+
     stop_event = threading.Event()
     _install_signal_handlers(stop_event)
 
@@ -85,6 +118,16 @@ def run_polling_loop(settings: Settings) -> None:
         try:
             snapshots = run_once(client, settings)
             metrics.record_success(snapshots)
+            poll_count += 1
+            
+            # Run ML inference periodically (data_fetcher is optional)
+            if (
+                ml_detector is not None 
+                and ml_detector.is_trained 
+                and poll_count % settings.ml_inference_interval == 0
+            ):
+                _run_ml_inference(ml_detector, data_fetcher, snapshots, metrics)
+                
         except AuthError as exc:
             metrics.record_failure()
             _LOGGER.error("Authentication attempt failed: %s", exc)
@@ -99,6 +142,69 @@ def run_polling_loop(settings: Settings) -> None:
             break
 
     _LOGGER.info("NightOwl poller stopped")
+
+
+def _run_ml_inference(
+    ml_detector: "MLLeakDetector",
+    data_fetcher: Optional["PrometheusDataFetcher"],
+    snapshots: List[DeviceSnapshot],
+    metrics: MetricsService,
+) -> None:
+    """Run ML inference for each device."""
+    for snapshot in snapshots:
+        device_id = snapshot.device_id
+        device_name = snapshot.name or ""
+        
+        if not device_id:
+            continue
+            
+        try:
+            # Try to fetch recent data from Prometheus for full feature calculation
+            recent_data = None
+            if data_fetcher is not None:
+                try:
+                    recent_data = data_fetcher.fetch_training_data(
+                        device_id=device_id,
+                        days=0.1,  # ~2.4 hours
+                    )
+                except Exception as e:
+                    _LOGGER.debug(f"Could not fetch Prometheus data: {e}")
+            
+            # If no Prometheus data, create a simple dataframe from current telemetry
+            if recent_data is None or recent_data.empty or len(recent_data) < 10:
+                # Create a minimal dataframe from current snapshot
+                telemetry = snapshot.timeseries or {}
+                if not telemetry:
+                    _LOGGER.debug(f"No telemetry for ML inference on {device_id}")
+                    continue
+                    
+                recent_data = pd.DataFrame([{
+                    "timestamp": datetime.utcnow(),
+                    **{k: v for k, v in telemetry.items() if isinstance(v, (int, float))}
+                }])
+                _LOGGER.debug(f"Using real-time telemetry for ML inference")
+            
+            # Run prediction
+            result = ml_detector.predict(recent_data)
+            
+            # Record metrics
+            metrics.record_ml_prediction(device_id, device_name, result)
+            
+            if result.is_anomaly:
+                _LOGGER.warning(
+                    f"ML ANOMALY DETECTED for {device_name} ({device_id}): "
+                    f"probability={result.leak_probability:.1%}, "
+                    f"score={result.anomaly_score:.3f}"
+                )
+            else:
+                _LOGGER.debug(
+                    f"ML inference for {device_name}: normal "
+                    f"(probability={result.leak_probability:.1%})"
+                )
+                
+        except Exception as e:
+            _LOGGER.error(f"ML inference failed for {device_id}: {e}")
+            metrics.record_ml_failure(device_id)
 
 
 def _build_summary(snapshot: DeviceSnapshot, summary_keys: Iterable[str]) -> Dict[str, Optional[str]]:

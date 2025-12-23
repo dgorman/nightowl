@@ -22,6 +22,32 @@ patches:
       kind: Deployment
       name: nightowl-monitor
 
+  # Add ML configuration for production
+  - patch: |-
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: NIGHTOWL_ML_ENABLED
+          value: "true"
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: NIGHTOWL_ML_MODEL_PATH
+          value: "/app/models/leak_detector.joblib"
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: NIGHTOWL_ML_PROMETHEUS_URL
+          value: "http://prometheus.solardashboard.svc.cluster.local:9090"
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: NIGHTOWL_ML_INFERENCE_INTERVAL
+          value: "5"
+    target:
+      kind: Deployment
+      name: nightowl-monitor
+
 # Note: Production secrets should be pre-created in the cluster
 # kubectl create secret generic nightowl-secret \
 #   --from-literal=username=ACTUAL_USERNAME \
