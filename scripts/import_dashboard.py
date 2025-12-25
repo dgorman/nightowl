@@ -5,13 +5,18 @@ Usage: ./import_dashboard.py
 """
 
 import json
+import os
 import requests
 import sys
 
-GRAFANA_URL = "http://localhost:3000"
-USERNAME = "admin"
-PASSWORD = "REDACTED_PASSWORD"
+GRAFANA_URL = os.environ.get("GRAFANA_URL", "http://localhost:3000")
+USERNAME = os.environ.get("GRAFANA_USERNAME", "admin")
+PASSWORD = os.environ.get("GRAFANA_PASSWORD")
 DASHBOARD_FILE = "grafana/nightowl-dashboard.json"
+
+if not PASSWORD:
+    print("Error: GRAFANA_PASSWORD environment variable is required")
+    sys.exit(1)
 
 def import_dashboard():
     """Import the NightOwl dashboard into Grafana."""
