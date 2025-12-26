@@ -552,6 +552,9 @@ python scripts/train_ml_model.py \
 
 ## Known Issues & Notes
 
-- **Demos User**: The `demos@nightowlmonitoring.com` account was added with a placeholder model (copied from dgorman's trained model). The portal URL `portal.nightowlmonitoring.com` does not resolve (DNS failure). When portal access is restored, fetch historical data and retrain the demos model.
-- **Portal URLs**: Code defaults to `portal.watersystem.live` (working). Previous README referenced `portal.nightowlmonitoring.com` (non-existent).
-- **Pushgateway Usage**: Only used in DEV for historical data import. Pushgateway retains only the latest value per label set, so repeated pushes overwrite previous data.
+- **Demos User**: The `demos@nightowlmonitoring.com` credentials work on `portal.watersystem.live`. Historical data has been fetched (920,295 data points across 2 devices over 90 days). The model is currently a placeholder (copied from dgorman). To train a proper demos model, deploy the demos instance to production where live telemetry will flow, then retrain using production Prometheus data.
+- **Credentials Verified** (as of 2025-12-26):
+  - `dgorman@nightowl.com` / `<password from secrets>` → ✅ Works
+  - `demos@nightowlmonitoring.com` / `<password from secrets>` → ✅ Works  
+- **Portal URL**: `portal.watersystem.live` (working)
+- **Pushgateway Usage**: Only used in DEV for historical data import. Pushgateway retains only the latest value per label set, so it's not suitable for ML training (which needs time-series history). Use live telemetry or Grafana Cloud queries for training.

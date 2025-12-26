@@ -5,6 +5,7 @@ namespace: nightowl
 
 resources:
   - ../../base
+  - nightowl-monitor-demos.yaml
 
 # Dev-specific image replacements (use local builds)
 images:
@@ -45,7 +46,7 @@ patches:
         path: /spec/template/spec/containers/0/env/-
         value:
           name: NIGHTOWL_ML_MODEL_PATH
-          value: "/app/models/leak_detector.joblib"
+          value: "/app/models/users/dgorman/leak_detector.joblib"
       - op: add
         path: /spec/template/spec/containers/0/env/-
         value:

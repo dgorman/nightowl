@@ -1,0 +1,83 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: nightowl-monitor-demos
+  namespace: nightowl
+spec:
+  selector:
+    app: nightowl-monitor-demos
+  ports:
+    - protocol: TCP
+      port: 8011
+      targetPort: 8011
+  type: LoadBalancer
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nightowl-monitor-demos
+  namespace: nightowl
+  labels:
+    app: nightowl-monitor-demos
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nightowl-monitor-demos
+  template:
+    metadata:
+      labels:
+        app: nightowl-monitor-demos
+    spec:
+      containers:
+      - name: nightowl-monitor
+        image: nightowl-monitor:dev
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8011
+        env:
+        - name: NIGHTOWL_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: nightowl-secret-demos
+              key: username
+        - name: NIGHTOWL_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: nightowl-secret-demos
+              key: password
+        - name: NIGHTOWL_TENANT
+          valueFrom:
+            secretKeyRef:
+              name: nightowl-secret-demos
+              key: tenant
+              optional: true
+        - name: NIGHTOWL_BASE_URL
+          value: "https://portal.watersystem.live"
+        - name: NIGHTOWL_POLL_INTERVAL_SECONDS
+          value: "60"
+        - name: NIGHTOWL_PAGE_SIZE
+          value: "5"
+        - name: NIGHTOWL_METRICS_HOST
+          value: "0.0.0.0"
+        - name: NIGHTOWL_METRICS_PORT
+          value: "8011"
+        - name: NIGHTOWL_ML_ENABLED
+          value: "true"
+        - name: NIGHTOWL_ML_MODEL_PATH
+          value: "/app/models/users/demos/leak_detector.joblib"
+        - name: NIGHTOWL_ML_INFERENCE_INTERVAL
+          value: "5"
+        volumeMounts:
+        - name: logs-volume
+          mountPath: /app/logs
+        - name: ml-models
+          mountPath: /app/models
+          readOnly: true
+      volumes:
+      - name: logs-volume
+        emptyDir: {}
+      - name: ml-models
+        hostPath:
+          path: /Users/dgorman/Dev/nightowl/models
+          type: Directory
