@@ -32,6 +32,10 @@ def main():
         df = df.drop(columns=['timestamp'])
         df = df.rename(columns={'datetime': 'timestamp'})
     
+    # Handle mixed timestamp formats (with and without microseconds)
+    if 'timestamp' in df.columns:
+        df['timestamp'] = pd.to_datetime(df['timestamp'], format='mixed')
+    
     print(f"Loaded {len(df)} rows")
     print(f"Columns: {df.columns.tolist()}")
     
