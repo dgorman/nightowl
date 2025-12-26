@@ -25,6 +25,14 @@ except ImportError:
     ML_AVAILABLE = False
     _LOGGER.warning("ML dependencies not available. Install scikit-learn, pandas, numpy for ML features.")
 
+# LLM imports (optional, graceful fallback if not installed)
+try:
+    from .llm_analyzer import LLMConfig, NightOwlLLMAnalyzer
+    LLM_AVAILABLE = True
+except ImportError:
+    LLM_AVAILABLE = False
+    _LOGGER.info("LLM analyzer not available. Install requests for LLM features.")
+
 
 def _configure_logging() -> None:
     logging.basicConfig(
@@ -82,6 +90,26 @@ def run_polling_loop(settings: Settings) -> None:
         settings.metrics_host,
         settings.metrics_port,
     )
+
+    # Initialize LLM analyzer if enabled
+    if settings.llm_enabled and LLM_AVAILABLE:
+        try:
+            llm_config = LLMConfig.from_env()
+            llm_analyzer = NightOwlLLMAnalyzer(llm_config)
+            
+            def llm_handler(question: str) -> dict:
+                """Handle LLM query requests."""
+                if not question:
+                    return llm_analyzer.analyze_current_state()
+                else:
+                    return llm_analyzer.analyze_current_state(question=question)
+            
+            metrics.set_llm_handler(llm_handler)
+            _LOGGER.info(f"LLM analyzer enabled with model {llm_config.ollama_model}")
+        except Exception as e:
+            _LOGGER.error(f"Failed to initialize LLM analyzer: {e}")
+    elif settings.llm_enabled and not LLM_AVAILABLE:
+        _LOGGER.warning("LLM enabled but dependencies not available")
 
     # Initialize ML detector if enabled
     ml_detector: Optional["MLLeakDetector"] = None

@@ -77,6 +77,8 @@ class Settings:
     ml_model_path: Optional[str]
     ml_prometheus_url: Optional[str]
     ml_inference_interval: int  # Run ML inference every N poll cycles
+    # LLM settings
+    llm_enabled: bool
 
     @staticmethod
     def from_env(env: Optional[dict[str, str]] = None) -> "Settings":
@@ -149,6 +151,9 @@ class Settings:
         if ml_inference_interval < 1:
             ml_inference_interval = 1
 
+        # LLM configuration
+        llm_enabled = source.get("NIGHTOWL_LLM_ENABLED", "false").lower() in ("true", "1", "yes")
+
         return Settings(
             username=username,
             password=password,
@@ -165,6 +170,7 @@ class Settings:
             ml_model_path=ml_model_path,
             ml_prometheus_url=ml_prometheus_url,
             ml_inference_interval=ml_inference_interval,
+            llm_enabled=llm_enabled,
         )
 
 

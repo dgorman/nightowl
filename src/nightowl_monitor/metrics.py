@@ -2,19 +2,25 @@
 
 from __future__ import annotations
 
+import json
+import logging
+import threading
 import time
-from typing import Iterable, Optional, TYPE_CHECKING
+from http.server import HTTPServer, BaseHTTPRequestHandler
+from typing import Callable, Iterable, Optional, TYPE_CHECKING
 
-from prometheus_client import CollectorRegistry, Counter, Gauge, start_http_server
+from prometheus_client import CollectorRegistry, Counter, Gauge, generate_latest, CONTENT_TYPE_LATEST
 
 from .client import DeviceSnapshot
 
 if TYPE_CHECKING:
     from .ml_leak_detector import MLLeakDetectionResult
 
+logger = logging.getLogger(__name__)
+
 
 class MetricsService:
-    """Publishes NightOwl device data to Prometheus."""
+    """Publishes NightOwl device data to Prometheus and handles LLM queries."""
 
     def __init__(
         self,
@@ -23,8 +29,13 @@ class MetricsService:
         *,
         registry: Optional[CollectorRegistry] = None,
         auto_start: bool = True,
+        llm_handler: Optional[Callable[[str], dict]] = None,
     ) -> None:
         self.registry = registry or CollectorRegistry()
+        self._llm_handler = llm_handler
+        self._host = host
+        self._port = port
+        
         self._telemetry_gauge = Gauge(
             "nightowl_telemetry_value",
             "Numeric NightOwl telemetry values",
@@ -123,9 +134,132 @@ class MetricsService:
             labelnames=("version",),
             registry=self.registry,
         )
+        
+        # LLM query counter
+        self._llm_query_counter = Counter(
+            "nightowl_llm_queries_total",
+            "Total LLM queries",
+            labelnames=("status",),
+            registry=self.registry,
+        )
 
         if auto_start:
-            start_http_server(port, addr=host, registry=self.registry)
+            self._start_server()
+    
+    def set_llm_handler(self, handler: Callable[[str], dict]) -> None:
+        """Set the LLM handler function after initialization."""
+        self._llm_handler = handler
+    
+    def _start_server(self) -> None:
+        """Start the custom HTTP server with metrics and LLM endpoints."""
+        metrics_service = self
+        
+        class NightOwlHandler(BaseHTTPRequestHandler):
+            def log_message(self, format, *args):
+                # Suppress default logging
+                pass
+            
+            def do_GET(self):
+                if self.path == "/metrics" or self.path == "/":
+                    self._handle_metrics()
+                elif self.path == "/ask/status":
+                    self._handle_llm_status()
+                elif self.path.startswith("/health"):
+                    self._handle_health()
+                else:
+                    self.send_error(404)
+            
+            def do_POST(self):
+                if self.path == "/ask":
+                    self._handle_llm_query()
+                else:
+                    self.send_error(404)
+            
+            def _handle_metrics(self):
+                output = generate_latest(metrics_service.registry)
+                self.send_response(200)
+                self.send_header("Content-Type", CONTENT_TYPE_LATEST)
+                self.end_headers()
+                self.wfile.write(output)
+            
+            def _handle_health(self):
+                response = {"status": "healthy", "timestamp": time.time()}
+                self._send_json(response)
+            
+            def _handle_llm_status(self):
+                if metrics_service._llm_handler is None:
+                    response = {
+                        "enabled": False,
+                        "message": "LLM analyzer not configured"
+                    }
+                else:
+                    try:
+                        from .llm_analyzer import LLMConfig, NightOwlLLMAnalyzer
+                        config = LLMConfig.from_env()
+                        analyzer = NightOwlLLMAnalyzer(config)
+                        status = analyzer.is_available()
+                        response = {
+                            "enabled": True,
+                            "ollama_available": status["ollama"],
+                            "grafana_cloud_configured": status["grafana_cloud"],
+                            "model": config.ollama_model,
+                        }
+                    except Exception as e:
+                        response = {
+                            "enabled": True,
+                            "error": str(e)
+                        }
+                self._send_json(response)
+            
+            def _handle_llm_query(self):
+                if metrics_service._llm_handler is None:
+                    metrics_service._llm_query_counter.labels(status="disabled").inc()
+                    self._send_json({
+                        "success": False,
+                        "error": "LLM analyzer not configured"
+                    }, status=503)
+                    return
+                
+                try:
+                    content_length = int(self.headers.get("Content-Length", 0))
+                    body = self.rfile.read(content_length).decode("utf-8")
+                    data = json.loads(body) if body else {}
+                    question = data.get("question", "")
+                    
+                    result = metrics_service._llm_handler(question)
+                    
+                    if result.get("success"):
+                        metrics_service._llm_query_counter.labels(status="success").inc()
+                    else:
+                        metrics_service._llm_query_counter.labels(status="failure").inc()
+                    
+                    self._send_json(result)
+                except json.JSONDecodeError:
+                    metrics_service._llm_query_counter.labels(status="error").inc()
+                    self._send_json({
+                        "success": False,
+                        "error": "Invalid JSON"
+                    }, status=400)
+                except Exception as e:
+                    metrics_service._llm_query_counter.labels(status="error").inc()
+                    logger.exception("LLM query error")
+                    self._send_json({
+                        "success": False,
+                        "error": str(e)
+                    }, status=500)
+            
+            def _send_json(self, data: dict, status: int = 200):
+                body = json.dumps(data, indent=2).encode("utf-8")
+                self.send_response(status)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+        
+        server = HTTPServer((self._host, self._port), NightOwlHandler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        logger.info(f"NightOwl HTTP server started on {self._host}:{self._port}")
 
     def record_success(self, snapshots: Iterable[DeviceSnapshot]) -> None:
         """Record a successful poll and update telemetry/attribute gauges."""
