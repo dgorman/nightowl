@@ -96,6 +96,13 @@ def run_polling_loop(settings: Settings) -> None:
         # Try to load existing model
         if ml_detector.load():
             _LOGGER.info("Loaded pre-trained ML model")
+            # Record model metadata in metrics
+            stats = ml_detector.training_stats
+            metrics.record_ml_model_info(
+                trained_at=stats.get("trained_at"),
+                training_samples=stats.get("training_samples"),
+                model_version=stats.get("model_version"),
+            )
         else:
             _LOGGER.warning("No pre-trained ML model found. Run training script to enable ML predictions.")
             ml_detector = None

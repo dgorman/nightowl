@@ -107,6 +107,22 @@ class MetricsService:
             labelnames=("device_id", "status"),
             registry=self.registry,
         )
+        self._ml_model_trained_at = Gauge(
+            "nightowl_ml_model_trained_at",
+            "Unix timestamp when the ML model was last trained",
+            registry=self.registry,
+        )
+        self._ml_model_training_samples = Gauge(
+            "nightowl_ml_model_training_samples",
+            "Number of samples used to train the ML model",
+            registry=self.registry,
+        )
+        self._ml_model_version = Gauge(
+            "nightowl_ml_model_version_info",
+            "ML model version (as info metric, value always 1)",
+            labelnames=("version",),
+            registry=self.registry,
+        )
 
         if auto_start:
             start_http_server(port, addr=host, registry=self.registry)
@@ -201,6 +217,28 @@ class MetricsService:
         self._ml_inference_counter.labels(
             device_id=device_id, status="failure"
         ).inc()
+
+    def record_ml_model_info(
+        self,
+        trained_at: Optional[str] = None,
+        training_samples: Optional[int] = None,
+        model_version: Optional[str] = None,
+    ) -> None:
+        """Record ML model metadata when loaded."""
+        if trained_at:
+            try:
+                from datetime import datetime
+                # Parse ISO format timestamp
+                if trained_at.endswith('Z'):
+                    trained_at = trained_at[:-1]
+                dt = datetime.fromisoformat(trained_at)
+                self._ml_model_trained_at.set(dt.timestamp())
+            except (ValueError, TypeError):
+                pass
+        if training_samples is not None:
+            self._ml_model_training_samples.set(training_samples)
+        if model_version:
+            self._ml_model_version.labels(version=model_version).set(1)
 
 
 def _to_float(value: object) -> Optional[float]:
