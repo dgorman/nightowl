@@ -43,7 +43,7 @@ class NightOwlClient:
 
     def __init__(
         self,
-        base_url: str = "https://portal.nightowlmonitoring.com",
+        base_url: str = "https://portal.watersystem.live",
         *,
         session: Optional[requests.Session] = None,
         timeout_seconds: int = 30,

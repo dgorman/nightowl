@@ -95,7 +95,7 @@ class Settings:
         username = required("NIGHTOWL_USERNAME")
         password = required("NIGHTOWL_PASSWORD")
         tenant = source.get("NIGHTOWL_TENANT")
-        base_url = source.get("NIGHTOWL_BASE_URL", "https://portal.nightowlmonitoring.com").rstrip("/")
+        base_url = source.get("NIGHTOWL_BASE_URL", "https://portal.watersystem.live").rstrip("/")
 
         interval_raw = source.get("NIGHTOWL_POLL_INTERVAL_SECONDS", "60")
         try:

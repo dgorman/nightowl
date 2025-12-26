@@ -39,19 +39,19 @@ class MetricsService:
         self._telemetry_gauge = Gauge(
             "nightowl_telemetry_value",
             "Numeric NightOwl telemetry values",
-            labelnames=("device_id", "device_name", "key"),
+            labelnames=("user_label", "device_id", "device_name", "key"),
             registry=self.registry,
         )
         self._attribute_gauge = Gauge(
             "nightowl_attribute_value",
             "Numeric NightOwl attribute values",
-            labelnames=("device_id", "device_name", "key"),
+            labelnames=("user_label", "device_id", "device_name", "key"),
             registry=self.registry,
         )
         self._device_info_gauge = Gauge(
             "nightowl_device_info",
             "NightOwl device presence flag",
-            labelnames=("device_id", "device_name"),
+            labelnames=("user_label", "device_id", "device_name"),
             registry=self.registry,
         )
         self._poll_success_gauge = Gauge(
@@ -73,43 +73,43 @@ class MetricsService:
         self._ml_anomaly_score = Gauge(
             "nightowl_ml_anomaly_score",
             "ML model anomaly score (negative = anomaly, positive = normal)",
-            labelnames=("device_id", "device_name"),
+            labelnames=("user_label", "device_id", "device_name"),
             registry=self.registry,
         )
         self._ml_leak_probability = Gauge(
             "nightowl_ml_leak_probability",
             "ML model leak probability (0-100%)",
-            labelnames=("device_id", "device_name"),
+            labelnames=("user_label", "device_id", "device_name"),
             registry=self.registry,
         )
         self._ml_is_anomaly = Gauge(
             "nightowl_ml_is_anomaly",
             "ML model anomaly flag (1=anomaly detected, 0=normal)",
-            labelnames=("device_id", "device_name"),
+            labelnames=("user_label", "device_id", "device_name"),
             registry=self.registry,
         )
         self._ml_model_confidence = Gauge(
             "nightowl_ml_model_confidence",
             "ML model confidence level (0=low, 1=medium, 2=high)",
-            labelnames=("device_id", "device_name"),
+            labelnames=("user_label", "device_id", "device_name"),
             registry=self.registry,
         )
         self._ml_feature_value = Gauge(
             "nightowl_ml_feature_value",
             "ML model feature values (top contributors)",
-            labelnames=("device_id", "device_name", "feature"),
+            labelnames=("user_label", "device_id", "device_name", "feature"),
             registry=self.registry,
         )
         self._ml_feature_contribution = Gauge(
             "nightowl_ml_feature_contribution",
             "ML feature contribution to anomaly score",
-            labelnames=("device_id", "device_name", "feature"),
+            labelnames=("user_label", "device_id", "device_name", "feature"),
             registry=self.registry,
         )
         self._ml_inference_timestamp = Gauge(
             "nightowl_ml_inference_timestamp",
             "Unix timestamp of the last ML inference",
-            labelnames=("device_id", "device_name"),
+            labelnames=("user_label", "device_id", "device_name"),
             registry=self.registry,
         )
         self._ml_inference_counter = Counter(
@@ -272,14 +272,20 @@ class MetricsService:
         for snapshot in snapshots:
             device_id = snapshot.device_id or "unknown"
             device_name = snapshot.name or ""
-            self._device_info_gauge.labels(device_id=device_id, device_name=device_name).set(1)
+            # Derive user_label from CustomerInfo attribute (e.g., "Dan Gorman" -> "dgorman")
+            customer_info = snapshot.attributes.get("CustomerInfo", "")
+            user_label = self._derive_user_label(customer_info)
+            
+            self._device_info_gauge.labels(
+                user_label=user_label, device_id=device_id, device_name=device_name
+            ).set(1)
 
             for key, value in snapshot.timeseries.items():
                 numeric = _to_float(value)
                 if numeric is None:
                     continue
                 self._telemetry_gauge.labels(
-                    device_id=device_id, device_name=device_name, key=key
+                    user_label=user_label, device_id=device_id, device_name=device_name, key=key
                 ).set(numeric)
 
             for key, value in snapshot.attributes.items():
@@ -287,7 +293,7 @@ class MetricsService:
                 if numeric is None:
                     continue
                 self._attribute_gauge.labels(
-                    device_id=device_id, device_name=device_name, key=key
+                    user_label=user_label, device_id=device_id, device_name=device_name, key=key
                 ).set(numeric)
 
     def record_failure(self) -> None:
@@ -296,11 +302,33 @@ class MetricsService:
         self._poll_counter.labels("failure").inc()
         self._poll_success_gauge.set(0)
 
+    @staticmethod
+    def _derive_user_label(customer_info: str) -> str:
+        """
+        Derive a user_label from CustomerInfo attribute.
+        
+        Examples:
+            "Dan Gorman" -> "dgorman"
+            "John Smith" -> "jsmith"
+            "" -> "unknown"
+        """
+        if not customer_info or not customer_info.strip():
+            return "unknown"
+        
+        parts = customer_info.strip().split()
+        if len(parts) >= 2:
+            # First initial + last name, lowercased
+            return (parts[0][0] + parts[-1]).lower()
+        elif len(parts) == 1:
+            return parts[0].lower()
+        return "unknown"
+
     def record_ml_prediction(
         self,
         device_id: str,
         device_name: str,
         result: "MLLeakDetectionResult",
+        user_label: str = "unknown",
     ) -> None:
         """Record ML leak detection prediction metrics."""
         
@@ -310,35 +338,35 @@ class MetricsService:
         
         # Core ML metrics
         self._ml_anomaly_score.labels(
-            device_id=device_id, device_name=device_name
+            user_label=user_label, device_id=device_id, device_name=device_name
         ).set(result.anomaly_score)
         
         self._ml_leak_probability.labels(
-            device_id=device_id, device_name=device_name
+            user_label=user_label, device_id=device_id, device_name=device_name
         ).set(result.leak_probability * 100)
         
         self._ml_is_anomaly.labels(
-            device_id=device_id, device_name=device_name
+            user_label=user_label, device_id=device_id, device_name=device_name
         ).set(1 if result.is_anomaly else 0)
         
         self._ml_model_confidence.labels(
-            device_id=device_id, device_name=device_name
+            user_label=user_label, device_id=device_id, device_name=device_name
         ).set(confidence_value)
         
         self._ml_inference_timestamp.labels(
-            device_id=device_id, device_name=device_name
+            user_label=user_label, device_id=device_id, device_name=device_name
         ).set(result.timestamp.timestamp())
         
         # Record top feature contributions
         for feature, contribution in result.feature_contributions.items():
             self._ml_feature_contribution.labels(
-                device_id=device_id, device_name=device_name, feature=feature
+                user_label=user_label, device_id=device_id, device_name=device_name, feature=feature
             ).set(contribution)
         
         # Record feature values (limited to avoid cardinality explosion)
         for feature, value in list(result.raw_features.items())[:20]:
             self._ml_feature_value.labels(
-                device_id=device_id, device_name=device_name, feature=feature
+                user_label=user_label, device_id=device_id, device_name=device_name, feature=feature
             ).set(value)
         
         # Increment inference counter

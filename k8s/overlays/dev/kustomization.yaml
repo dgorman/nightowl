@@ -103,9 +103,15 @@ patches:
       name: nightowl-monitor
 
 # Create dev secrets (using production credentials)
+# Note: For multi-user support, create separate secrets per user
 secretGenerator:
   - name: nightowl-secret
     literals:
       - username=dgorman@nightowl.com
+      - password=REPLACE_WITH_ACTUAL_PASSWORD
+      - tenant=""
+  - name: nightowl-secret-demos
+    literals:
+      - username=demos@nightowlmonitoring.com
       - password=REPLACE_WITH_ACTUAL_PASSWORD
       - tenant=""

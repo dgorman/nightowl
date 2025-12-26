@@ -222,8 +222,12 @@ def _run_ml_inference(
             # Run prediction
             result = ml_detector.predict(recent_data)
             
+            # Derive user_label from CustomerInfo
+            customer_info = snapshot.attributes.get("CustomerInfo", "")
+            user_label = MetricsService._derive_user_label(customer_info)
+            
             # Record metrics
-            metrics.record_ml_prediction(device_id, device_name, result)
+            metrics.record_ml_prediction(device_id, device_name, result, user_label=user_label)
             
             if result.is_anomaly:
                 _LOGGER.warning(

@@ -18,7 +18,7 @@ Provide credentials via environment variables (for local development you can sto
 | `NIGHTOWL_USERNAME` | ✅ | NightOwl account username. |
 | `NIGHTOWL_PASSWORD` | ✅ | Password for the NightOwl account. |
 | `NIGHTOWL_TENANT` | ⛔️ | Optional tenant identifier if your NightOwl instance requires it. |
-| `NIGHTOWL_BASE_URL` | ⛔️ | Override the API base URL (defaults to `https://portal.nightowlmonitoring.com`). |
+| `NIGHTOWL_BASE_URL` | ⛔️ | Override the API base URL (defaults to `https://portal.watersystem.live`). |
 | `NIGHTOWL_POLL_INTERVAL_SECONDS` | ⛔️ | Poll frequency in seconds (minimum 10, defaults to 60). |
 | `NIGHTOWL_PAGE_SIZE` | ⛔️ | Number of devices to request per poll (minimum 1, defaults to 5). |
 | `NIGHTOWL_TIMESERIES_KEYS` | ⛔️ | Comma-separated list of telemetry keys to request (defaults to the NightOwl Flex list). |
@@ -54,13 +54,31 @@ NightOwl Monitor exposes Prometheus metrics at `http://<host>:<port>/` (by defau
 
 > **Production Note:** In Kubernetes deployments, set `NIGHTOWL_METRICS_PORT=8000` to match the service port configuration.
 
+### Multi-User Support
+
+All metrics include a `user_label` dimension to isolate data between different NightOwl accounts. The label is automatically derived from the `CustomerInfo` attribute (e.g., "Dan Gorman" → "dgorman").
+
+**Example**: Multiple deployments can run concurrently for different users, with metrics cleanly separated:
+```promql
+nightowl_telemetry_value{user_label="dgorman", device_name="3701155"}
+nightowl_telemetry_value{user_label="demos", device_name="demo-device-1"}
+```
+
+This enables:
+- **Shared Prometheus instance**: One scrape target per user deployment
+- **User-specific dashboards**: Grafana variables filter by `user_label`
+- **Per-user ML models**: Separate leak detection models trained on each user's data
+
 Key metric families:
 
-- `nightowl_telemetry_value{device_id,device_name,key}` — numeric telemetry readings (volts, amps, levels, etc.).
-- `nightowl_attribute_value{...}` — numeric device attributes (boolean strings are mapped to 1/0).
-- `nightowl_device_info{device_id,device_name}` — presence indicator for each discovered device.
-- `nightowl_last_poll_success` / `nightowl_last_poll_timestamp` — health markers for the polling loop.
-- `nightowl_poll_attempts_total{status}` — counter of successful vs failed polls.
+- `nightowl_telemetry_value{user_label,device_id,device_name,key}` — numeric telemetry readings (volts, amps, levels, etc.).
+- `nightowl_attribute_value{user_label,...}` — numeric device attributes (boolean strings are mapped to 1/0).
+- `nightowl_device_info{user_label,device_id,device_name}` — presence indicator for each discovered device.
+- `nightowl_last_poll_success{user_label}` / `nightowl_last_poll_timestamp{user_label}` — health markers for the polling loop.
+- `nightowl_poll_attempts_total{user_label,status}` — counter of successful vs failed polls.
+- `nightowl_ml_leak_probability{user_label,device_id,device_name}` — ML leak detection probability (0-100%).
+- `nightowl_ml_anomaly_score{user_label,device_id,device_name}` — Isolation Forest decision score.
+- `nightowl_ml_is_anomaly{user_label,device_id,device_name}` — Binary anomaly flag.
 
 ### Scrape configuration example
 
@@ -82,16 +100,23 @@ If you're running the container locally, you can replace `nightowl-monitor.local
 
 ### Grafana dashboard
 
-Import `grafana/nightowl-dashboard.json` into Grafana to get a starter view over the NightOwl data. The dashboard expects a Prometheus data source; during import, choose the data source that scrapes your NightOwl monitor.
+Import `grafana/nightowl-ml-dashboard.json` into Grafana to get a comprehensive view of water system health including ML leak detection.
 
-The dashboard includes:
+The dashboard supports **multi-user filtering** with cascading dropdowns:
+1. **User** selector: Choose from available `user_label` values
+2. **Device** selector: Automatically filtered to show only devices for the selected user
 
-- **Water Level %** stat card sourced from `Level1_precent` telemetry.
-- **Pump Voltages/Currents** time-series panels (keys `P1V1-3`, `P1C1-3`).
-- **Device Attributes** table for metadata such as `CustomerInfo` and modem status.
-- **Poll Status** indicator driven by `nightowl_last_poll_success`.
+Dashboard panels include:
 
-Use the *Device* dropdown (populated via `nightowl_device_info`) to focus on a specific NightOwl device.
+- **Water Level %** stat card sourced from `Level1_precent` telemetry
+- **ML Leak Detection Status**: Real-time anomaly probability and confidence
+- **Pump Voltages/Currents** time-series panels (keys `P1V1-3`, `P1C1-3`)
+- **Pressure Trends**: Historical pressure data with anomaly overlays
+- **Device Attributes** table for metadata such as `CustomerInfo` and modem status
+- **Poll Status** indicator driven by `nightowl_last_poll_success`
+- **Feature Contributions**: ML explainability showing which sensors triggered anomalies
+
+All queries automatically filter by `user_label=~"$user"` to isolate data for the selected user.
 
 ## Sample Output
 
@@ -139,6 +164,29 @@ Well_Level-1, Level1_precent, Pulse_TotalGallons
 ## Machine Learning Leak Detection
 
 NightOwl Monitor includes an intelligent leak detection system that learns what "normal" looks like for your water system and alerts you when something seems off.
+
+### Multi-User Model Architecture
+
+The system supports **per-user ML models** to handle different water system configurations and usage patterns:
+
+```
+models/
+├── global/                         # Fallback model (generic training)
+│   └── leak_detector.joblib
+└── users/                          # Per-user models
+    ├── dgorman/                    # Trained on dgorman's 90-day history
+    │   └── leak_detector.joblib
+    └── demos/                      # Demo account (placeholder)
+        └── leak_detector.joblib
+```
+
+**Why per-user models?**
+- Different systems have different "normal" patterns (residential vs commercial, well vs municipal)
+- Usage patterns vary (family of 4 vs vacation rental)
+- Sensor configurations differ (pressure-only vs pressure+flow+level)
+- Reduces false positives by learning your specific system's behavior
+
+The monitor automatically loads the model for the authenticated user based on the `user_label` derived from `CustomerInfo`.
 
 ### How It Works (Plain English)
 
@@ -257,6 +305,7 @@ Key parameters:
 
 #### Training the Model
 
+**Single-User Model:**
 ```bash
 # Install dependencies
 pip install -r requirements.txt
@@ -266,24 +315,78 @@ python scripts/train_ml_model.py \
   --prometheus-url https://prometheus-prod-13-prod-us-east-0.grafana.net/api/prom \
   --username 1953220 \
   --password "$GRAFANA_CLOUD_READ_TOKEN" \
-  --days 30
+  --days 90 \
+  --user-label dgorman \
+  --model-path models/users/dgorman/leak_detector.joblib
 
 # Or train from local Prometheus
-python scripts/train_ml_model.py --prometheus-url http://localhost:9090 --days 30
+python scripts/train_ml_model.py \
+  --prometheus-url http://localhost:9090 \
+  --days 90 \
+  --user-label dgorman \
+  --model-path models/users/dgorman/leak_detector.joblib
 ```
+
+**Adding a New User:**
+
+1. **Create model directory:**
+   ```bash
+   mkdir -p models/users/newuser
+   ```
+
+2. **Fetch historical data** (if not already in Prometheus):
+   ```bash
+   python scripts/fetch_nightowl_data.py \
+     --username "newuser@domain.com" \
+     --password "password" \
+     --days 90 \
+     --output data/newuser_export
+   ```
+
+3. **Train user-specific model:**
+   ```bash
+   python scripts/train_ml_model.py \
+     --prometheus-url http://localhost:9090 \
+     --days 90 \
+     --user-label newuser \
+     --model-path models/users/newuser/leak_detector.joblib
+   ```
+
+4. **Add Kubernetes secrets** (for production deployment):
+   ```yaml
+   # k8s/overlays/dev/kustomization.yaml or prod equivalent
+   - name: nightowl-secret-newuser
+     literals:
+       - NIGHTOWL_USERNAME=newuser@domain.com
+       - NIGHTOWL_PASSWORD=password
+       - NIGHTOWL_ML_ENABLED=true
+       - NIGHTOWL_ML_MODEL_PATH=/app/models/users/newuser/leak_detector.joblib
+   ```
+
+5. **Deploy separate instance:**
+   ```bash
+   kubectl apply -k k8s/overlays/dev  # or prod
+   ```
+
+**Model Loading Behavior:**
+- Looks for `models/users/{user_label}/leak_detector.joblib` first
+- Falls back to `models/global/leak_detector.joblib` if user-specific model not found
+- Logs warning if no model available (ML disabled for that user)
 
 #### ML Prometheus Metrics
 
+All ML metrics include `user_label` for multi-user isolation:
+
 | Metric | Type | Description |
 | --- | --- | --- |
-| `nightowl_ml_leak_probability` | Gauge | ML leak probability (0-100%) |
-| `nightowl_ml_anomaly_score` | Gauge | Isolation Forest decision score (negative = anomaly) |
-| `nightowl_ml_is_anomaly` | Gauge | Binary flag (1 = anomaly detected) |
-| `nightowl_ml_model_confidence` | Gauge | Model confidence (0=low, 1=medium, 2=high) |
-| `nightowl_ml_feature_contribution` | Gauge | Per-feature contribution to anomaly score |
-| `nightowl_ml_feature_value` | Gauge | Current feature values used in prediction |
-| `nightowl_ml_inference_timestamp` | Gauge | Unix timestamp of last inference |
-| `nightowl_ml_inferences_total` | Counter | Total inference runs by status |
+| `nightowl_ml_leak_probability{user_label,device_id,device_name}` | Gauge | ML leak probability (0-100%) |
+| `nightowl_ml_anomaly_score{user_label,device_id,device_name}` | Gauge | Isolation Forest decision score (negative = anomaly) |
+| `nightowl_ml_is_anomaly{user_label,device_id,device_name}` | Gauge | Binary flag (1 = anomaly detected) |
+| `nightowl_ml_model_confidence{user_label,device_id,device_name}` | Gauge | Model confidence (0=low, 1=medium, 2=high) |
+| `nightowl_ml_feature_contribution{user_label,device_id,device_name,feature}` | Gauge | Per-feature contribution to anomaly score |
+| `nightowl_ml_feature_value{user_label,device_id,device_name,feature}` | Gauge | Current feature values used in prediction |
+| `nightowl_ml_inference_timestamp{user_label,device_id,device_name}` | Gauge | Unix timestamp of last inference |
+| `nightowl_ml_inferences_total{user_label,device_id,device_name,status}` | Counter | Total inference runs by status |
 
 #### ML vs Statistical Detection
 
@@ -302,6 +405,12 @@ python scripts/train_ml_model.py --prometheus-url http://localhost:9090 --days 3
 
 ### Development (Docker Desktop)
 
+The dev overlay supports **multiple user deployments** with separate secrets for each user.
+
+**Current Users:**
+- `dgorman` (dgorman@nightowl.com) - primary user with 90-day trained model
+- `demos` (demos@nightowlmonitoring.com) - demo account with placeholder model
+
 ```bash
 # Build local image
 docker build -t nightowl-monitor:dev .
@@ -314,9 +423,11 @@ kubectl get pods -n nightowl
 kubectl logs -n nightowl deployment/nightowl-monitor
 ```
 
-**Note**: Dev deployment does NOT push metrics to Grafana Cloud to prevent polluting production data.
+**Note**: Dev deployment uses a **separate Prometheus ConfigMap** (`prometheus-configmap-dev.yaml`) that does NOT include `remote_write` to Grafana Cloud. This prevents dev test data from polluting production metrics.
 
 ### Production (MicroK8s)
+
+Production uses a **separate Prometheus ConfigMap** (`prometheus-configmap-prod.yaml`) that includes `remote_write` to push metrics to Grafana Cloud.
 
 ```bash
 # SSH to prod and pull latest changes
@@ -332,13 +443,19 @@ kubectl apply -f monitoring/k8s/grafana-cloud-solardashboard-secret.yaml
 kubectl patch deployment prometheus -n solardashboard \
   --patch-file monitoring/k8s/prometheus-secrets-patch.yaml
 
-# Apply Prometheus config
-kubectl apply -f monitoring/k8s/prometheus-configmap.yaml
+# Apply PRODUCTION Prometheus config (includes remote_write)
+kubectl apply -f monitoring/k8s/prometheus-configmap-prod.yaml
 
 # Deploy NightOwl
 kubectl apply -k k8s/overlays/prod
 kubectl rollout restart deployment/nightowl-monitor -n nightowl
 ```
+
+**Dev vs Prod Prometheus Configs:**
+| Config | File | remote_write | pushgateway | Use Case |
+| --- | --- | --- | --- | --- |
+| DEV | `prometheus-configmap-dev.yaml` | ❌ No | ✅ Yes | Local testing, historical data import |
+| PROD | `prometheus-configmap-prod.yaml` | ✅ Yes | ❌ No | Live monitoring, Grafana Cloud integration |
 
 ## Grafana Cloud Integration
 
@@ -356,19 +473,28 @@ Tokens are stored as Kubernetes secrets in the `solardashboard` namespace:
 
 ### Training with Grafana Cloud
 
+Query historical data from Grafana Cloud to train user-specific models:
+
 ```bash
 # Get read token from secret
 READ_TOKEN=$(kubectl get secret grafana-cloud-nightowl -n solardashboard \
   -o jsonpath='{.data.read-token}' | base64 -d)
 
-# Train ML model using Grafana Cloud historical data
+# Train ML model for specific user using Grafana Cloud historical data
 python scripts/train_ml_model.py \
   --prometheus-url "https://prometheus-prod-13-prod-us-east-0.grafana.net/api/prom" \
   --username "1953220" \
   --password "$READ_TOKEN" \
-  --days 30 \
-  --model-path models/leak_detector.joblib
+  --days 90 \
+  --user-label "dgorman" \
+  --model-path models/users/dgorman/leak_detector.joblib
 ```
+
+**Training Recommendations:**
+- **Minimum**: 30 days of data for basic model
+- **Recommended**: 90 days to capture seasonal patterns and usage variations
+- **Optimal**: 6+ months for production-grade models with high confidence
+- Retrain models quarterly or after significant system changes (new pump, sensor upgrades)
 
 ### Available Telemetry in Grafana Cloud
 
@@ -412,10 +538,20 @@ python scripts/train_ml_model.py \
 | --- | --- |
 | `src/nightowl_monitor/` | Python source code |
 | `src/nightowl_monitor/ml_leak_detector.py` | ML leak detection module |
+| `src/nightowl_monitor/metrics.py` | Prometheus metrics with user_label support |
 | `scripts/train_ml_model.py` | ML model training script |
-| `models/leak_detector.joblib` | Trained ML model (gitignored) |
+| `scripts/fetch_nightowl_data.py` | Historical data fetcher from NightOwl portal |
+| `models/global/` | Global fallback ML models |
+| `models/users/{username}/` | Per-user ML models (gitignored) |
 | `k8s/base/` | Base Kubernetes manifests |
-| `k8s/overlays/dev/` | Dev-specific patches (Docker Desktop) |
-| `k8s/overlays/prod/` | Prod-specific patches (MicroK8s) |
-| `monitoring/k8s/` | Prometheus/Grafana config for prod |
-| `grafana/` | Grafana dashboard JSON files |
+| `k8s/overlays/dev/` | Dev-specific patches (Docker Desktop, no remote_write) |
+| `k8s/overlays/prod/` | Prod-specific patches (MicroK8s, with remote_write) |
+| `monitoring/k8s/prometheus-configmap-dev.yaml` | DEV Prometheus config (includes pushgateway, no remote_write) |
+| `monitoring/k8s/prometheus-configmap-prod.yaml` | PROD Prometheus config (includes remote_write to Grafana Cloud) |
+| `grafana/nightowl-ml-dashboard.json` | Multi-user Grafana dashboard with ML panels |
+
+## Known Issues & Notes
+
+- **Demos User**: The `demos@nightowlmonitoring.com` account was added with a placeholder model (copied from dgorman's trained model). The portal URL `portal.nightowlmonitoring.com` does not resolve (DNS failure). When portal access is restored, fetch historical data and retrain the demos model.
+- **Portal URLs**: Code defaults to `portal.watersystem.live` (working). Previous README referenced `portal.nightowlmonitoring.com` (non-existent).
+- **Pushgateway Usage**: Only used in DEV for historical data import. Pushgateway retains only the latest value per label set, so repeated pushes overwrite previous data.
