@@ -48,6 +48,25 @@ patches:
       kind: Deployment
       name: nightowl-monitor
 
+  # Mount ML model from host path (decoupled from image)
+  - patch: |-
+      - op: add
+        path: /spec/template/spec/volumes/-
+        value:
+          name: ml-models
+          hostPath:
+            path: /home/dgorman/Apps/nightowl/models
+            type: Directory
+      - op: add
+        path: /spec/template/spec/containers/0/volumeMounts/-
+        value:
+          name: ml-models
+          mountPath: /app/models
+          readOnly: true
+    target:
+      kind: Deployment
+      name: nightowl-monitor
+
 # Note: Production secrets should be pre-created in the cluster
 # kubectl create secret generic nightowl-secret \
 #   --from-literal=username=ACTUAL_USERNAME \

@@ -83,6 +83,25 @@ patches:
       kind: Deployment
       name: nightowl-monitor
 
+  # Mount local model file from host (allows updating model without rebuilding image)
+  - patch: |-
+      - op: add
+        path: /spec/template/spec/volumes/-
+        value:
+          name: ml-models
+          hostPath:
+            path: /Users/dgorman/Dev/nightowl/models
+            type: Directory
+      - op: add
+        path: /spec/template/spec/containers/0/volumeMounts/-
+        value:
+          name: ml-models
+          mountPath: /app/models
+          readOnly: true
+    target:
+      kind: Deployment
+      name: nightowl-monitor
+
 # Create dev secrets (using production credentials)
 secretGenerator:
   - name: nightowl-secret
