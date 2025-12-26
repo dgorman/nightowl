@@ -51,6 +51,34 @@ patches:
         value:
           name: NIGHTOWL_ML_INFERENCE_INTERVAL
           value: "5"
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: NIGHTOWL_LLM_ENABLED
+          value: "true"
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: OLLAMA_URL
+          value: "http://host.docker.internal:11434"
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: OLLAMA_MODEL
+          value: "qwen2.5:14b"
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: GRAFANA_CLOUD_USER
+          value: "1953220"
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: GRAFANA_CLOUD_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: nightowl-llm-secret
+              key: grafana-cloud-token
     target:
       kind: Deployment
       name: nightowl-monitor
