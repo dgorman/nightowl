@@ -172,7 +172,7 @@ def _run_ml_inference(
                 try:
                     recent_data = data_fetcher.fetch_training_data(
                         device_id=device_id,
-                        days=0.1,  # ~2.4 hours
+                        days=1.5,  # 36 hours - covers 24h rolling windows + buffer
                     )
                 except Exception as e:
                     _LOGGER.debug(f"Could not fetch Prometheus data: {e}")

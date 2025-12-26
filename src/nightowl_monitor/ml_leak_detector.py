@@ -257,7 +257,7 @@ class MLLeakDetector:
 
     def __init__(
         self,
-        contamination: float = 0.05,  # Expected fraction of anomalies
+        contamination: float = 0.15,  # Expected fraction of anomalies (higher = less sensitive)
         n_estimators: int = 100,
         random_state: int = 42,
         model_path: Optional[Path] = None,
@@ -391,8 +391,13 @@ class MLLeakDetector:
         score_std = self.training_stats.get("score_std", 0.1)
         
         # Z-score normalized probability
+        # Dividing by 6 instead of 4 makes the model less sensitive (requires stronger signal)
         z_score = (score_mean - decision_score) / max(score_std, 0.01)
-        leak_probability = min(max(z_score / 4, 0), 1)  # Clip to 0-1
+        leak_probability = min(max(z_score / 6, 0), 1)  # Clip to 0-1
+
+        # Only flag as anomaly if probability exceeds 50% (was model's 5% contamination threshold)
+        # This reduces false positives by requiring a stronger anomaly signal
+        is_anomaly = leak_probability > 0.50
 
         # Calculate feature contributions (approximate via perturbation)
         feature_contributions = self._calculate_feature_contributions(
@@ -416,7 +421,7 @@ class MLLeakDetector:
 
         return MLLeakDetectionResult(
             anomaly_score=float(decision_score),
-            is_anomaly=(prediction == -1),
+            is_anomaly=is_anomaly,
             leak_probability=leak_probability,
             feature_contributions=feature_contributions,
             raw_features=raw_features,
