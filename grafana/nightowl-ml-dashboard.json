@@ -105,7 +105,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "grafanacloud-evergreen-prom"
       },
       "description": "Probability of a water leak based on ML Isolation Forest model",
       "fieldConfig": {
@@ -154,7 +154,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "grafanacloud-evergreen-prom"
       },
       "description": "Isolation Forest anomaly score. Negative = anomaly, Positive = normal",
       "fieldConfig": {
@@ -204,7 +204,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "grafanacloud-evergreen-prom"
       },
       "description": "Is the ML model detecting an anomaly right now?",
       "fieldConfig": {
@@ -259,7 +259,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "grafanacloud-evergreen-prom"
       },
       "description": "Model confidence based on training data quality (0=low, 1=medium, 2=high)",
       "fieldConfig": {
@@ -316,7 +316,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "grafanacloud-evergreen-prom"
       },
       "description": "When the ML model was last trained",
       "fieldConfig": {
@@ -363,7 +363,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "grafanacloud-evergreen-prom"
       },
       "description": "Number of samples used to train the ML model",
       "fieldConfig": {
@@ -412,7 +412,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "grafanacloud-evergreen-prom"
       },
       "description": "Current ML model version",
       "fieldConfig": {
@@ -458,7 +458,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "grafanacloud-evergreen-prom"
       },
       "description": "Comparison of ML vs statistical leak detection",
       "fieldConfig": {
@@ -518,7 +518,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "grafanacloud-evergreen-prom"
       },
       "description": "Time since last ML inference ran",
       "fieldConfig": {
@@ -566,7 +566,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "grafanacloud-evergreen-prom"
       },
       "description": "Total ML inferences by status",
       "fieldConfig": {
@@ -623,7 +623,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "grafanacloud-evergreen-prom"
       },
       "description": "ML leak probability over time",
       "fieldConfig": {
@@ -681,7 +681,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "grafanacloud-evergreen-prom"
       },
       "description": "Isolation Forest anomaly score over time",
       "fieldConfig": {
@@ -751,7 +751,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "grafanacloud-evergreen-prom"
       },
       "description": "Top features contributing to the current anomaly score",
       "fieldConfig": {
@@ -816,7 +816,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "grafanacloud-evergreen-prom"
       },
       "description": "Current values of key ML input features",
       "fieldConfig": {
@@ -895,7 +895,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "grafanacloud-evergreen-prom"
       },
       "description": "Compare all z-score metrics from statistical analysis with ML scores",
       "fieldConfig": {
@@ -988,7 +988,7 @@
         },
         "datasource": {
           "type": "prometheus",
-          "uid": "${DS_PROMETHEUS}"
+          "uid": "grafanacloud-evergreen-prom"
         },
         "definition": "label_values(nightowl_device_info, device_name)",
         "hide": 0,
